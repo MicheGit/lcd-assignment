@@ -1,0 +1,6 @@
+{
+    "haskell.serverExecutablePath": "/home/miche/.ghcup/bin/haskell-language-server-9.4.8~2.7.0.0",
+    "haskell.toolchain": {
+
+    }
+}

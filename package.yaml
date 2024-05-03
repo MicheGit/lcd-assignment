@@ -1,10 +1,10 @@
 name:                lcd-assignment
 version:             0.1.0.0
-github:              "githubuser/lcd-assignment"
+github:              "MicheGit/lcd-assignment"
 license:             BSD-3-Clause
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2024 Author name here"
+author:              "Christian Micheletti"
+maintainer:          "christian.micheletti@studenti.unipd.it"
+copyright:           "2024 Christian Micheletti"
 
 extra-source-files:
 - README.md
@@ -17,10 +17,11 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/lcd-assignment#readme>
+description:         Please see the README on GitHub at <https://github.com/MicheGit/lcd-assignment#readme>
 
 dependencies:
 - base >= 4.7 && < 5
+- megaparsec
 
 ghc-options:
 - -Wall
@@ -32,6 +33,9 @@ ghc-options:
 - -Wmissing-home-modules
 - -Wpartial-fields
 - -Wredundant-constraints
+
+default-extensions:
+- GADTs
 
 library:
   source-dirs: src
