@@ -1,0 +1,75 @@
+\documentclass{beamer}
+
+\usetheme{Padova}
+
+\usepackage{graphicx}
+\usepackage{float}
+
+% questi sono per i simboli e font per le formule
+\usepackage{stmaryrd}
+\usepackage{mathtools}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+
+% listings
+\usepackage{listings}
+\lstdefinelanguage{whilelang}
+{
+  % list of keywords
+  basicstyle=\ttfamily,
+  morekeywords={
+    skip,
+    if,
+	then,
+	else,
+    while,
+    do,
+	true,
+	false,
+	and,
+	or
+  },
+  sensitive=true, % keywords are not case-sensitive
+  morecomment=[l]{//}, % l is for line comment
+  morecomment=[s]{/*}{*/}, % s is for start and end delimiter
+  morestring=[b]", % defines that strings are enclosed in double quotes
+  keywordstyle={\color{purple}\bfseries}
+}
+
+% simboli
+\usepackage{textcomp}
+\usepackage{upgreek}
+\usepackage{tipa}
+
+\newcommand{\defas}[0]{\stackrel{\text{def}}{=}}
+\newcommand{\pipe}[0]{\,\,|\,\,}
+
+\newcommand{\semantics}[3][]{
+    \mathcal{#2}_{#1} \llbracket #3 \rrbracket
+}
+
+\newcommand{\asem}[3][]{
+    \mathcal{#2}^{\sharp}_{#1} \llbracket #3 \rrbracket
+}
+
+\title{Implementation of a Linear Session Type System}
+\subtitle{Second assignment of the Languages for Concurrency and Distribution, A.Y. 2023/2024}
+\author{Christian Micheletti}
+\date{\today}
+
+
+\begin{document}
+
+	\maketitle
+
+	\begin{frame}{Outline}
+		\tableofcontents
+	\end{frame}
+
+    \input{src/0-outline.tex}
+    \input{src/1-basics.tex}
+    % \input{src/language.tex}
+	% \input{src/implementation.tex}
+	% \input{src/performing-analysis.tex}
+\end{document}

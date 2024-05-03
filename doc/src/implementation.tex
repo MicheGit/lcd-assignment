@@ -1,0 +1,291 @@
+\section{Implementation}
+
+\subsection{The Bounded Intervals Domain}
+
+\begin{frame}{Bounded Intervals - Definition}
+    \[ I_{m,n} \subset \wp(\mathbb{Z})\text{ with }m,n\in\mathbb{Z}\cup{-\infty, \infty}\]
+    \begin{flalign*}
+        I_{m,n} & = \{ \mathbb{Z}, \emptyset \} \cup \{ \{ z \} \pipe z \in \mathbb{Z} \} \\
+        & \cup \{ \{ x \pipe w <= x <= z \} \pipe x,w,z \in \mathbb{Z}\text{ s.t. }m <= w <= z <= n \} \\
+        & \cup \{ \{ x \pipe x \leq z \} \pipe x,z \in \mathbb{Z}\text{ s.t. }m <= z <= n\} \\
+        & \cup \{ \{ x \pipe x \geq z \} \pipe x,z \in \mathbb{Z}\text{ s.t. }m <= z <= n\} \\
+    \end{flalign*}
+\end{frame}
+
+\begin{frame}{Bounded Intervals - Properties (1)}
+
+    \begin{exampleblock}{$I_{m,n}$ is partially ordered}
+        \[ i_1 \sqsubseteq i_2 \iff i_1 \subseteq i_2 \]
+    \end{exampleblock}
+
+    \begin{exampleblock}{$I_{m,n}$ is a complete lattice}
+        \begin{flalign*}
+            \bot_{I_{m,n}} &= \emptyset \\
+            \top_{I_{m,n}} &= \mathbb{Z} \\
+            \lor_{I_{m,n}} &= \cup \\
+            \land_{I_{m,n}} &= \cap
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Bounded Intervals - Properties (2)}
+    \begin{itemize}
+        \item $I_{m,n}$ has no infinite ascending chains when $m \neq -\infty \land n \neq \infty$:
+        \begin{itemize}
+            \item when $m,n\in \mathbb{N}$ the fixed-point iteration sequence induced by $\forall s \in \mathbb{S}_{I_{m,n}},\,\,S_1 \in \textbf{While}$.$\mathcal{D}^{\#}\llbracket S_1 \rrbracket s$ converges in finite time;
+            \item otherwise, we must make use of the widening operator $\nabla: \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \to\mathbb{S}_{I_{m,n}}$ in order to enforce convergence. 
+        \end{itemize}
+        \item $I_{m,n}$ has no infinite descending chains:
+        \begin{itemize}
+            \item any descending greatest fixed-point search converges in finite time;
+            \item there is no need for a narrowing operator $\Delta: \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \to\mathbb{S}_{I_{m,n}}$
+        \end{itemize}
+    \end{itemize}
+    
+\end{frame}
+
+\subsection{Abstract States}
+
+\begin{frame}{Abstract States (1)}
+    We define for any abstract domain $A$, which is a complete lattice as well, the abstract state type $\mathbb{S}_A = Map(Var, A)$.
+    
+    \begin{alertblock}{Assumption}
+        We assume that all the variables referenced in the program have been initialized. Therefore, the value of a non initialized variable is assumed to be ``unknown'' ($\top_A$). 
+        %% Non è affare nostro sapere se ci sono delle variabili non inizializzate, bensì ci occorre sapere se il programma termini in maniera corretta
+    \end{alertblock}
+\end{frame}
+
+\begin{frame}{Abstract States (2)}
+    \begin{exampleblock}{$\mathbb{S}_{I_{m,n}}$ is partially ordered}
+        \[ s_1 \sqsubseteq_{\mathbb{S}_{I_{m,n}}} s_2 \, \Longleftrightarrow \forall x \in Var\,. s_1(x) \sqsubseteq_{I_{m,n}} s_2(x) \]
+    \end{exampleblock}
+
+    \begin{exampleblock}{$\mathbb{S}_{I_{m,n}}$ is a complete lattice}
+        \begin{flalign*}
+            \bot_{\mathbb{S}_{I_{m,n}}} &= \{ (x, \bot_{I_{m,n}}) \pipe x \in Var \} \\
+            \top_{\mathbb{S}_{I_{m,n}}} &= \emptyset \\
+            s_1 \lor_{\mathbb{S}_{I_{m,n}}} s_2  &= \{ (var, a_1 \lor_{I_{m,n}} a_2) \pipe (var, a_1) \in s_1, (var, a_2) \in s_2 \} \\
+            s_1 \land_{\mathbb{S}_{I_{m,n}}} s_2  &= \{ (var, a_1 \land_{I_{m,n}} a_2) \pipe (var, a_1) \in s_1, (var, a_2) \in s_2 \} \\
+            &\cup \{ e \pipe e \in s_1, e \notin s_2 \} \cup \{ e \pipe e \notin s_1,e \in s_2 \} \\
+        \end{flalign*} 
+    \end{exampleblock} 
+\end{frame}
+
+\begin{frame}{Abstract States (3)}
+
+    $\bot_{\mathbb{S}_{I_{m,n}}}$ represents an abnormal termination or sure divergence $\uparrow$. Hence, such a state is propagated through the remaining execution and no recover is possible:
+
+    \begin{flalign*}
+        s(x) &= \begin{cases}
+            a & (x, a) \in s \\
+            \top_{I_{m,n}} & otherwise 
+        \end{cases} \\
+        s[x \mapsto a] &= \begin{cases}
+            \bot_{\mathbb{S}_{I_{m,n}}} & s = \bot_{\mathbb{S}_{I_{m,n}}} \\
+            \{ (k, v) \pipe (k, v) \in s,\,\,k\neq x \} & a \neq \top_{I_{m,n}},\,\,s \neq \bot_{\mathbb{S}_{I_{m,n}}}\\
+            \{ (k, v) \pipe (k, v) \in s,\,\,k\neq x \}  & otherwise
+        \end{cases}
+    \end{flalign*}
+\end{frame}
+
+\subsection{Abstract Semantics}
+
+\begin{frame}{Abstract Semantics}
+    The abstract semantic functions are:
+    \begin{itemize}
+        \item $\mathcal{A}^\sharp : AExp \to \mathbb{S}_{I_{m,n}} \to I_{m,n} \times \mathbb{S}_{I_{m,n}}$
+        \begin{itemize}
+            \item the first element of the tuple approximates the possible results of the arithmetic expression;
+            \item the second element approximates the possible states after the transition induced by the expression;
+        \end{itemize}
+        \item $\mathcal{B}^\sharp : BExp \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \times \mathbb{S}_{I_{m,n}}$
+        \begin{itemize}
+            \item the first element of the tuple approximates the states where the boolean expression can evaluate to \textbf{tt};
+            \item the second element approximates the states where the boolean expression can evaluate \textbf{ff}.
+        \end{itemize}
+        This function returns two states, instead of one, in order to preserve the short circuit behavior of boolean operators along with a compositional definition.
+        %% per mantenere rappresentato lo short-circuit degli operatori logici mantenendo la definizione composizionale era necessario che la funzione B# restituisse anche lo stato in caso BExp valutasse a falso
+        \item $\mathcal{D}^\sharp : While \to \mathbb{S}_{I_{m,n}} \to\mathbb{S}_{I_{m,n}}$.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - AExp (1)}
+    \begin{exampleblock}{$\mathcal{A}^\sharp : AExp \to \mathbb{S}_{I_{m,n}} \to I_{m,n} \times \mathbb{S}_{I_{m,n}}$}
+        \begin{flalign*}
+            \asem{A}{n} s^{\sharp} = & (\{n_\mathbb{Z}\}, s^{\sharp}) \\
+            \asem{A}{x} s^{\sharp} = & (s^{\sharp}(x), s^{\sharp}) \\
+            \asem{A}{(e)} s^{\sharp} = & \asem{A}{e} s^{\sharp} \\
+            \asem{A}{-e} s^{\sharp} = & (-a^{\sharp}, s^{\sharp}_1) \\
+            \text{where } & (a^{\sharp}, s^{\sharp}_1) = \asem{A}{e} s^{\sharp} \\
+            \asem{A}{[e_1, e_2]} s^{\sharp} = & (\{a^{\sharp}_1,\dots,a^{\sharp}_2\}, s^{\sharp}_2) \\
+            \text{where } & (a^{\sharp}_1, s^{\sharp}_1) = \asem{A}{e_1} s^{\sharp} \\
+            & (a^{\sharp}_2, s^{\sharp}_2) = \asem{A}{e_2} s^{\sharp}_1
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+
+\begin{frame}{Abstract Semantics - AExp (2)}
+    \begin{exampleblock}{$\mathcal{A}^\sharp : AExp \to \mathbb{S}_{I_{m,n}} \to I_{m,n} \times \mathbb{S}_{I_{m,n}}$}
+        \begin{flalign*}
+            \asem{A}{e_1\,\mathbf{op}\,e_2} s^{\sharp} = & (a^{\sharp}_1\,\,op_{I_{m,n}}\,\,a^{\sharp}_2, s^{\sharp}_2) \\ 
+            \text{where } & (a^{\sharp}_1, s^{\sharp}_1) = \asem{A}{e_1} s^{\sharp} \\
+            & (a^{\sharp}_2, s^{\sharp}_2) = \asem{A}{e_2} s^{\sharp}_1
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+
+\begin{frame}{Abstract Semantics - AExp (3)}
+    \begin{exampleblock}{$\mathcal{A}^\sharp : AExp \to \mathbb{S}_{I_{m,n}} \to I_{m,n} \times \mathbb{S}_{I_{m,n}}$}
+        \begin{flalign*}
+            \asem{A}{x\texttt{++}} s^{\sharp} = & (s^{\sharp}(x), s^{\sharp}[x \mapsto x+_{I_{m,n}}1]) \\
+            \asem{A}{\texttt{++}x} s^{\sharp} = & (s^{\sharp}_1(x), s^{\sharp}_1) \\
+            \text{where } & s^{\sharp}[x \mapsto x+_{I_{m,n}}1] = s^{\sharp}_1 \\
+            \asem{A}{x\texttt{--}} s^{\sharp} = & (s^{\sharp}(x), s^{\sharp}[x \mapsto x-_{I_{m,n}}1]) \\
+            \asem{A}{\texttt{--}x} s^{\sharp} = & (s^{\sharp}_1(x), s^{\sharp}_1) \\
+            \text{where } & s^{\sharp}[x \mapsto x-_{I_{m,n}}1] = s^{\sharp}_1 \\
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - BExp (1)}
+    %The first member of the pair over-approximates the states where the boolean expression holds, the second member over-approximates the states where the expression doesn't hold.
+
+    \begin{exampleblock}{$\mathcal{B}^{\sharp} : BExp \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \times \mathbb{S}_{I_{m,n}}$}
+        \small\begin{flalign*}
+            \asem{B}{\texttt{true}} s^{\sharp} = & (s^{\sharp}, \bot_{\mathcal{S}_{I_{m,n}}}) \\
+            \asem{B}{\texttt{false}} s^{\sharp} = & (\bot_{\mathcal{S}_{I_{m,n}}}, s^{\sharp}) \\
+            \asem{B}{(b)} s^{\sharp} = & \asem{B}{b} s^{\sharp}\\
+            \asem{B}{b_1\,\,\texttt{and}\,\,b_2} s^{\sharp} = & (s^{\sharp(then)}_2, s^{\sharp(else)}_1 \lor_{\mathbb{S}_{I_{m,n}}} s^{\sharp(else)}_2) \\
+            \text{where } & (s^{\sharp(then)}_1, s^{\sharp(else)}_1) = \asem{B}{b_1} s^{\sharp} \\
+            & (s^{\sharp(then)}_2, s^{\sharp(else)}_2) = \asem{B}{b_2} s^{\sharp(then)}_1 \\
+            \asem{B}{b_1\,\,\texttt{or}\,\,b_2} s^{\sharp} = & (s^{\sharp(then)}_1 \lor_{\mathbb{S}_{I_{m,n}}} s^{\sharp(then)}_2, s^{\sharp(else)}_2 ) \\
+            \text{where } & (s^{\sharp(then)}_1, s^{\sharp(else)}_1) = \asem{B}{b_1} s^{\sharp} \\
+            & (s^{\sharp(then)}_2, s^{\sharp(else)}_2) = \asem{B}{b_2} s^{\sharp(else)}_1 \\
+        \end{flalign*}
+        
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - BExp (2)}
+
+    \begin{exampleblock}{$\mathcal{B}^{\sharp} : BExp \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \times \mathbb{S}_{I_{m,n}}$}
+        \small\begin{flalign*}
+            \asem{B}{e_1\texttt{ = }e_2} s^{\sharp} = &
+            \begin{cases}
+                (\bot_{\mathbb{S}_{I_{m,n}}}, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 = \bot_{I_{m,n}} \lor a_2 = \bot_{I_{m,n}} \\
+                (\bot_{\mathbb{S}_{I_{m,n}}}, s^{\sharp}_2) & a_1 \land_{I_{m,n}} a_2 = \bot_{I_{m,n}} \\
+                (s^{\sharp}_2, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 = a_2 \land |a_1| = |a_2| = 1 \\
+                (trans(s^{\sharp(=)}), trans(s)) & otherwise
+            \end{cases}\\
+            \text{where } & (a_1, s^{\sharp}_1) = \asem{A}{e_1} s^{\sharp} \\
+            & (a_2, s^{\sharp}_2) = \asem{A}{e_2} s^{\sharp}_1 \\
+            & trans = \pi_2 \circ \asem{A}{e_2} \circ \pi_2 \circ \asem{A}{e_1}\\
+            \asem{B}{e_1\texttt{ != }e_2} s^{\sharp} = & (s^{\sharp}_2, s^{\sharp}_1) \\
+            \text{where } & (s^{\sharp}_1, s^{\sharp}_2) = \asem{B}{e_1\texttt{ = }e_2} s^{\sharp}
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - BExp (3)}
+
+    \begin{block}{Variable refinements}
+
+        When one or both arithmetic expressions are variable, then we can be more precise:
+        
+        \small\begin{flalign*}
+            s^{\sharp(=)} = &\text{GFP}_{s^{\sharp}} f \\
+            \text{where } & f(s) = s[x \mapsto a_1 \land_{I_{m,n}} a_2] \\
+            & \forall\,(\text{Var x}) \in \{e_1, e_2\}, (a_1, s_1) = \asem{A}{e_1} s, (a_2, \_) = \asem{A}{e_2} s_1 \\
+        \end{flalign*}
+
+        Since $f$ is descending monotone (it changes the abstract values with the $\land_{I_{m,n}}$ operator of up to two variables) and $I_{m,n}$ has no infinite descending chains, the GFP of $f$ converges in finite time.
+    \end{block}
+\end{frame}
+
+
+\begin{frame}{Abstract Semantics - BExp (4)}
+    \begin{exampleblock}{$\mathcal{B}^{\sharp} : BExp \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \times \mathbb{S}_{I_{m,n}}$}
+        \small\begin{flalign*}
+            \asem{B}{e_1\texttt{ < }e_2} s^{\sharp} = &
+            \begin{cases}
+                (\bot_{\mathbb{S}_{I_{m,n}}}, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 = \bot_{I_{m,n}} \lor a_2 = \bot_{I_{m,n}} \\
+                (\bot_{\mathbb{S}_{I_{m,n}}}, s^{\sharp}_2) & a_1 <_{I_{m,n}} a_2 \\
+                (s^{\sharp}_2, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 \geq_{I_{m,n}} a_2 \\
+                (trans(s^{\sharp(<)}), trans(s^{\sharp(\geq)})) & otherwise
+            \end{cases}\\
+            \text{where } & (a_1, s^{\sharp}_1) = \asem{A}{e_1} s^{\sharp} \\
+            & (a_2, s^{\sharp}_2) = \asem{A}{e_2} s^{\sharp}_1 \\
+            & trans = \pi_2 \circ \asem{A}{e_2} \circ \pi_2 \circ \asem{A}{e_1}\\
+            \asem{B}{e_1\texttt{ >= }e_2} s^{\sharp} = & (s^{\sharp}_2, s^{\sharp}_1) \\
+            \text{where } & (s^{\sharp}_1, s^{\sharp}_2) = \asem{B}{e_1\texttt{ < }e_2} s^{\sharp}
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - BExp (5)}
+    \begin{exampleblock}{$\mathcal{B}^{\sharp} : BExp \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \times \mathbb{S}_{I_{m,n}}$}
+        \small\begin{flalign*}
+            \asem{B}{e_1\texttt{ > }e_2} s^{\sharp} = &
+            \begin{cases}
+                (\bot_{\mathbb{S}_{I_{m,n}}}, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 = \bot_{I_{m,n}} \lor a_2 = \bot_{I_{m,n}} \\
+                (\bot_{\mathbb{S}_{I_{m,n}}}, s^{\sharp}_2) & a_1 >_{I_{m,n}} a_2 \\
+                (s^{\sharp}_2, \bot_{\mathbb{S}_{I_{m,n}}}) & a_1 \leq_{I_{m,n}} a_2 \\
+                (trans(s^{\sharp(>)}), trans(s^{\sharp(\leq)})) & otherwise
+            \end{cases}\\
+            \text{where } & (a_1, s^{\sharp}_1) = \asem{A}{e_1} s^{\sharp} \\
+            & (a_2, s^{\sharp}_2) = \asem{A}{e_2} s^{\sharp}_1 \\
+            & trans = \pi_2 \circ \asem{A}{e_2} \circ \pi_2 \circ \asem{A}{e_1}\\
+            \asem{B}{e_1\texttt{ <= }e_2} s^{\sharp} = & (s^{\sharp}_2, s^{\sharp}_1) \\
+            \text{where } & (s^{\sharp}_1, s^{\sharp}_2) = \asem{B}{e_1\texttt{ > }e_2} s^{\sharp}
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - Statements (1)}
+    \begin{exampleblock}{$\mathcal{D}^\sharp : \mathbf{While} \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}}$}
+        
+        \begin{flalign*}
+            \asem{D}{x\texttt{ := }e} s^{\sharp} & \defas
+            \begin{cases}
+                s'^\sharp [x \mapsto a] & (a, s'^\sharp) = \asem{A}{e} s^\sharp\\ 
+                & \land a \neq \bot_{I_{m,n}} \\
+                \bot_{\mathbb{S}_{I_{m,n}}} & otherwise
+            \end{cases}\\
+            \asem{D}{\texttt{skip}} s^{\sharp} & \defas s^{\sharp} \\
+            \asem{D}{S_1\texttt{ ; }S_2} s^{\sharp} & \defas (\asem{D}{S_1} \circ \asem{D}{S_2}) s^{\sharp}
+        \end{flalign*}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - Statements (2)}
+    \begin{exampleblock}{$\mathcal{D}^\sharp : \mathbf{While} \to \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}}$}
+        
+        \small\begin{flalign*}
+            \asem{D}{\texttt{if }b\texttt{ then }S_1\texttt{ else }S_2} s^{\sharp} & \defas (\asem{B}{S_1} s^{\sharp}_{\mathbf{tt}}) \lor_{\mathbb{S}_{I_{m,n}}} (\asem{B}{S_2} s_{\mathbf{ff}}^{\sharp}) \\
+            where &\quad\,\,\, (s^{\sharp}_{\mathbf{tt}}, s_{\mathbf{ff}}^{\sharp}) = \asem{B}{b} s^{\sharp}\\
+            \asem{D}{\texttt{while }b\texttt{ do }S} s^{\sharp} & \defas \pi_2 (\asem{B}{b} (\text{GFP}_{\text{FIX } F} (\lambda s.s \land_{\mathbb{S}_{I_{m,n}}} F\,\,s))) \\
+            where &\quad\,\,\, F: \mathbb{S}_{I_{m,n}} \to \mathbb{S}_{I_{m,n}} \\
+            &\quad\,\,\, F\,\,s = s^{\sharp} \lor_{\mathbb{S}_{I_{m,n}}} (\asem{D}{S} \circ \pi_1 \circ \asem{B}{b} s) \\
+        \end{flalign*}
+    \end{exampleblock}
+
+    \small{Where FIX $F$ refers to the fixed point of the function $F$ and GFP$_s$ $f$ is the greatest fixed point of $f$ found starting from $s$.}
+\end{frame}
+
+\begin{frame}{Abstract Semantics - Statements (3)}
+    \small\begin{alertblock}{Widened invariant refinition}
+        Since $I_{m,n}$ has infinitely ascending chains, FIX $F$ might diverge. Therefore, in the implementation, we make use of a widened iteration sequence.
+
+        The \textbf{widened invariant} resulting from (possibly) widened FIX $F$ is later refined with the GFP of $\lambda s.s \land_{\mathbb{S}_{I_{m,n}}} F\,s$.
+    \end{alertblock}
+
+    \small{This is sound:
+    \begin{itemize}
+        \item the widened invariant $s^{*\sharp}$ is a sound over-approximation of the smallest loop invariant $s^{*}$;
+        \item $s^{*} = F\,\,s^{*}$, so $s^{*} = s^{*} \land_{\mathbb{S}_{I_{m,n}}} F\,\,s^{*}$: therefore $\lambda s.s \land_{\mathbb{S}_{I_{m,n}}} F\,s$ (descending monotone) is a sound filtering of those states not in $s^*$. 
+    \end{itemize}
+    Therefore, GFP $F$ starting from $s^{*\sharp}$ is the most precise refinement of the widened invariant.}
+    
+\end{frame}
