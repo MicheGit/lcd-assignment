@@ -1,4 +1,4 @@
-module SessionPi.Language () where
+module SessionPi.Language (Proc, Val) where
 
 data Proc where
     Snd :: String -> Val -> Proc -> Proc
@@ -6,7 +6,7 @@ data Proc where
     Par :: Proc -> Proc -> Proc
     Brn :: Val -> Proc -> Proc
     Nil :: Proc
-    Bnd :: Val -> String -> String -> Proc
+    Bnd :: String -> String -> Proc
 
 data Val where
     Var :: String -> Val
