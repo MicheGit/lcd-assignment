@@ -37,6 +37,8 @@ ghc-options:
 
 default-extensions:
 - GADTs
+- OverloadedStrings
+- LambdaCase
 
 library:
   source-dirs: src
@@ -62,3 +64,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - lcd-assignment
+    - hspec
+    - megaparsec
