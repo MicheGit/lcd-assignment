@@ -1,11 +1,12 @@
 module SessionPi.Parser where
 
 import Data.Void (Void)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 
-import Control.Monad (void)
+import Control.Monad (void, join)
 
-import Text.Megaparsec (Parsec, choice, some, MonadParsec (notFollowedBy), try, empty, (<|>), between)
+import Text.Megaparsec (Parsec, choice, some, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse)
+import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
@@ -16,7 +17,8 @@ type Parser = Parsec
     Void -- No custom errors
     Text -- Parse Text
 
--- TODO define tokens, keywords...
+parseProcess :: String -> String -> Either (E.ParseErrorBundle Text Void) Proc
+parseProcess fileName content = parse process fileName (pack content)
 
 symbols :: [Text]
 symbols =
@@ -39,15 +41,29 @@ keywords =
 
 
 process :: Parser Proc
-process = choice
+process = processExpr
+
+processLeaves :: [Parser Proc]
+processLeaves =
     [ inaction
-    --, send
-    --, receive
-    --, pipe
+    , send
+    , receive
     , branch
-    --, bind
+    , bind
     , betweenCurly process
     ]
+
+processExpr :: Parser Proc
+processExpr = do
+    p1 <- parseLeaf
+    do
+        symbol "|"
+        Par p1 <$> processExpr
+        <|>
+        return p1
+
+parseLeaf :: Parser Proc
+parseLeaf = choice $ try <$> processLeaves
 
 send :: Parser Proc
 send = do
@@ -64,12 +80,6 @@ receive = do
     var <- variable
     symbol "."
     Rec chn var <$> process
-
-pipe :: Parser Proc
-pipe = do
-    p1 <- process
-    symbol "|"
-    Par p1 <$> process
 
 branch :: Parser Proc
 branch = do
@@ -105,14 +115,12 @@ literal = choice
     , False <$ keyword "false"
     ]
 
+anyKeyword :: Parser ()
+anyKeyword = choice $ keyword <$> keywords
+
 variable :: Parser String
-variable = do
-    do
-        try $ choice $ keyword <$> keywords
-        empty
-        <|>
-        return ()
-    lexeme $ some C.lowerChar
+variable = join (empty <$ try anyKeyword) <|> lexeme (some C.lowerChar)
+
 
 symbol :: Text -> Parser ()
 symbol sy = void (L.symbol sc sy)

@@ -43,6 +43,7 @@ library
       base >=4.7 && <5
     , megaparsec
     , text
+    , unordered-containers
   default-language: Haskell2010
 
 executable lcd-assignment-exe
@@ -63,6 +64,7 @@ executable lcd-assignment-exe
     , lcd-assignment
     , megaparsec
     , text
+    , unordered-containers
   default-language: Haskell2010
 
 test-suite lcd-assignment-test
@@ -86,4 +88,5 @@ test-suite lcd-assignment-test
     , lcd-assignment
     , megaparsec
     , text
+    , unordered-containers
   default-language: Haskell2010
