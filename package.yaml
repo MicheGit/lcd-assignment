@@ -40,6 +40,9 @@ default-extensions:
 - GADTs
 - OverloadedStrings
 - LambdaCase
+- ImplicitParams
+- RankNTypes
+- InstanceSigs
 
 library:
   source-dirs: src

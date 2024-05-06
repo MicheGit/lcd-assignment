@@ -1,4 +1,3 @@
-{-# LANGUAGE InstanceSigs #-}
 module SessionPi.Language where
 import Data.HashSet (HashSet, empty, union, insert, singleton, delete)
 
@@ -28,6 +27,10 @@ unvar :: Val -> String
 unvar (Var x) = x
 unvar _ = undefined
 
+unlit :: Val -> Bool
+unlit (Lit l) = l
+unlit _ = undefined
+
 class Expr a where
     fv :: a -> HashSet String
     substitute :: a -> Val -> String -> a
@@ -41,7 +44,7 @@ instance Expr Val where
     substitute t@(Var x) v y
         | x == y    = v
         | otherwise = t
-    
+
 
 instance Expr Proc where
     fv :: Proc -> HashSet String
@@ -78,7 +81,5 @@ instance Expr Proc where
             -- z' = z -- perché non è una fv
             p'  | x == z || x == y  = p
                 | otherwise         = substitute p v x
-
-
 
 
