@@ -5,7 +5,7 @@ import Data.Text (Text, pack)
 
 import Control.Monad (void, join)
 
-import Text.Megaparsec (Parsec, choice, some, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse)
+import Text.Megaparsec (Parsec, choice, some, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse, many)
 import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -65,22 +65,6 @@ processExpr = do
 parseLeaf :: Parser Proc
 parseLeaf = choice $ try <$> processLeaves
 
-send :: Parser Proc
-send = do
-    chn <- variable
-    symbol "<<"
-    val <- value
-    symbol "."
-    Snd chn val <$> process
-
-receive :: Parser Proc
-receive = do
-    chn <- variable
-    symbol ">>"
-    var <- variable
-    symbol "."
-    Rec chn var <$> process
-
 branch :: Parser Proc
 branch = do
     keyword "if"
@@ -88,7 +72,7 @@ branch = do
     keyword "then"
     p1 <- process
     keyword "else"
-    Brn guard p1 <$> process
+    Brn guard p1 <$> parseLeaf
 
 inaction :: Parser Proc
 inaction = do
@@ -101,7 +85,23 @@ bind = do
     symbol "><"
     ch2 <- variable
     symbol "."
-    Bnd ch1 ch2 <$> process
+    Bnd ch1 ch2 <$> parseLeaf
+
+send :: Parser Proc
+send = do
+    chn <- variable
+    symbol "<<"
+    val <- value
+    symbol "."
+    Snd chn val <$> parseLeaf
+
+receive :: Parser Proc
+receive = do
+    chn <- variable
+    symbol ">>"
+    var <- variable
+    symbol "."
+    Rec chn var <$> parseLeaf
 
 value :: Parser Val
 value = choice $ try <$>
@@ -119,7 +119,13 @@ anyKeyword :: Parser ()
 anyKeyword = choice $ keyword <$> keywords
 
 variable :: Parser String
-variable = join (empty <$ try anyKeyword) <|> lexeme (some C.lowerChar)
+variable = join (empty <$ try anyKeyword) <|> variable'
+
+variable' :: Parser String
+variable' = lexeme $ do
+    c <- C.lowerChar
+    (c:) <$> many (C.alphaNumChar <|> C.char '_')
+
 
 
 symbol :: Text -> Parser ()

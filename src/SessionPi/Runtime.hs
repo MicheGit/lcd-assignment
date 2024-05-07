@@ -1,24 +1,27 @@
 module SessionPi.Runtime where
 import Control.Exception (throw)
-import Control.Concurrent (MVar, putMVar, takeMVar, forkIO, newEmptyMVar, myThreadId, forkFinally)
+import Control.Concurrent (MVar, putMVar, takeMVar, newEmptyMVar, myThreadId, forkFinally)
 
 import SessionPi.Language
 import Data.HashMap.Lazy (HashMap, insert, (!?), empty)
-import Data.Maybe (fromJust)
 import Text.Printf (printf)
 
-data Channel = Channel (MVar Val) (MVar ())
+data ChannelEnd where
+    ReadEnd :: (MVar Val) -> (MVar ()) -> ChannelEnd
+    WriteEnd :: (MVar Val) -> (MVar ()) -> ChannelEnd 
 
-send :: Channel -> Val -> IO ()
-send (Channel var idle) val = do
+send :: ChannelEnd -> Val -> IO ()
+send (WriteEnd var idle) val = do
     takeMVar idle       -- waits until the other end is ready to receive
     putMVar var val
+send _ _ = throw $ userError "Tried to send on a read end of a channel"
 
-receive :: Channel -> IO Val
-receive (Channel var idle) = do
+receive :: ChannelEnd -> IO Val
+receive (ReadEnd var idle) = do
     putMVar idle ()     -- signals the other end tha it is ready to receive
                         -- this means that if another process is awaiting to read, this thread will wait for a free channel
     takeMVar var
+receive _ = throw $ userError "Tried to send on a write end of a channel"
 
 run :: Proc -> IO ()
 run =
@@ -26,7 +29,7 @@ run =
         ?variables = empty
      in run'
 
-type ProcIO a = (?channels :: HashMap String Channel, ?variables :: HashMap String Val) => IO a
+type ProcIO a = (?channels :: HashMap String ChannelEnd, ?variables :: HashMap String Val) => IO a
 
 run' :: Proc -> ProcIO ()
 run' Nil = do
@@ -45,8 +48,8 @@ run' (Par p1 p2) = do
     logInfo "FORK"
     end1 <- newEmptyMVar
     end2 <- newEmptyMVar
-    pid1 <- forkFinally (run' p1) (\_ -> putMVar end1 ())
-    pid2 <- forkFinally (run' p2) (\_ -> putMVar end2 ())
+    pid1 <- forkFinally (run' p1) $ notifyThreadEnd end1
+    pid2 <- forkFinally (run' p2) $ notifyThreadEnd end2
     logInfo (printf "FORK processes with id %s and %s" (show pid1) (show pid2))
     takeMVar end1
     takeMVar end2
@@ -70,10 +73,11 @@ run' (Bnd x y p) = do
     logInfo (printf "BINDING channel ends %s and %s" x y)
     var <- newEmptyMVar
     lock <- newEmptyMVar
-    let chan = Channel var lock
-    let ?channels = insert x chan $ insert y chan ?channels in run' p
+    let readEnd = ReadEnd var lock
+    let writeEnd = WriteEnd var lock
+    let ?channels = insert x writeEnd $ insert y readEnd ?channels in run' p
 
-channel :: String -> ProcIO Channel
+channel :: String -> ProcIO ChannelEnd
 channel x = case ?channels !? x of
         Just chan -> return chan
         Nothing   -> throw $ userError (printf "Channel %s is undefined" x)
@@ -89,6 +93,11 @@ logInfo :: String -> ProcIO ()
 logInfo s = do
     pid <- myThreadId
     printf "%s: [%s]\n" (show pid) s
+
+notifyThreadEnd :: Show tres => MVar () -> tres -> ProcIO ()
+notifyThreadEnd endvar result = do
+    logInfo (show result)
+    putMVar endvar ()
 
 
 

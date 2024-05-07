@@ -4,7 +4,7 @@ import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import Control.Exception (throw)
 
-import SessionPi.Language (Proc)
+import SessionPi.Language (Proc, preprocess)
 import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
 
@@ -25,7 +25,7 @@ getParsedProgram = do
     filecontent <- readFile filename
     let result = parseProcess filename filecontent
     case result of
-        Right program -> return (filename, program)
+        Right program -> return (filename, preprocess program)
         Left err -> do
             print err
             throw $ userError "Syntax Error"

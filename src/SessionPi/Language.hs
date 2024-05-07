@@ -82,4 +82,22 @@ instance Expr Proc where
             p'  | x == z || x == y  = p
                 | otherwise         = substitute p v x
 
+-- bind is active in all parallel branches by definition, equivalently here we lift it to the parent node
+-- inefficiente ma vabbè
+preprocess :: Proc -> Proc
+preprocess (Par p1 p2) = b1 $ b2 p'
+    where
+        (b1, p1') = case p1 of
+                Bnd x y p -> (Bnd x y . preprocess, p)
+                _         -> (id, p1)
+        (b2, p2') = case p2 of
+                Bnd x y p -> (Bnd x y . preprocess, p)
+                _         -> (id, p2)
+        p' = Par (preprocess p1') (preprocess p2')
+preprocess Nil = Nil
+preprocess (Snd x y p) = Snd x y (preprocess p)
+preprocess (Rec x y p) = Rec x y (preprocess p)
+preprocess (Bnd x y p) = Bnd x y (preprocess p)
+preprocess (Brn g p1 p2) = Brn g (preprocess p1) (preprocess p2)
+
 
