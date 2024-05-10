@@ -23,7 +23,7 @@ dependencies:
 - base >= 4.7 && < 5
 - megaparsec
 - text
-- unordered-containers
+- containers
 
 ghc-options:
 - -Wall
@@ -43,6 +43,7 @@ default-extensions:
 - ImplicitParams
 - RankNTypes
 - InstanceSigs
+- FlexibleInstances
 
 library:
   source-dirs: src

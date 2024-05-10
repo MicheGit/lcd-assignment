@@ -42,12 +42,13 @@ library
       ImplicitParams
       RankNTypes
       InstanceSigs
+      FlexibleInstances
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
+    , containers
     , megaparsec
     , text
-    , unordered-containers
   default-language: Haskell2010
 
 executable lcd-assignment-exe
@@ -65,13 +66,14 @@ executable lcd-assignment-exe
       ImplicitParams
       RankNTypes
       InstanceSigs
+      FlexibleInstances
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
     , lcd-assignment
     , megaparsec
     , text
-    , unordered-containers
   default-language: Haskell2010
 
 test-suite lcd-assignment-test
@@ -91,12 +93,13 @@ test-suite lcd-assignment-test
       ImplicitParams
       RankNTypes
       InstanceSigs
+      FlexibleInstances
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
+    , containers
     , hspec
     , lcd-assignment
     , megaparsec
     , text
-    , unordered-containers
   default-language: Haskell2010

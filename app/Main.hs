@@ -1,6 +1,5 @@
 module Main (main) where
 
-import Text.Read (readMaybe)
 import System.Environment (getArgs)
 import Control.Exception (throw)
 
@@ -9,11 +8,9 @@ import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
 
 main :: IO ()
-main = do 
-    (filename, program) <- getParsedProgram
-    run program
+main = getParsedProgram >>= run
 
-getParsedProgram :: IO (String, Proc)
+getParsedProgram :: IO Proc
 getParsedProgram = do
     args <- getArgs
     filename <- case args of
@@ -25,7 +22,7 @@ getParsedProgram = do
     filecontent <- readFile filename
     let result = parseProcess filename filecontent
     case result of
-        Right program -> return (filename, preprocess program)
+        Right program -> return (preprocess program)
         Left err -> do
             print err
             throw $ userError "Syntax Error"
