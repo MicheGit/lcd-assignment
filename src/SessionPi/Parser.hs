@@ -10,7 +10,7 @@ import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
 
-import SessionPi.Language (Proc (Snd, Rec, Par, Brn, Nil, Bnd), Val (Var, Lit))
+import SessionPi.Language (Proc (Snd, Rec, Par, Brn, Nil, Bnd), Val (Var, Lit), BoundVar, dualType, SpiType (Boolean, End, Qualified), Qualifier (Lin, Un), Pretype (Sending, Receiving))
 
 -- Parser :: * -> *
 type Parser = Parsec
@@ -37,6 +37,10 @@ keywords =
     , "0"
     , "true"
     , "false"
+    , "end"
+    , "bool"
+    , "lin"
+    , "un"
     ]
 
 
@@ -81,11 +85,12 @@ inaction = do
 
 bind :: Parser Proc
 bind = do
-    ch1 <- variable
+    var1 <- variable
     symbol "><"
-    ch2 <- variable
+    cl2@(_, t2) <- claim
     symbol "."
-    Bnd ch1 ch2 <$> parseLeaf
+    let t1 = dualType <$> t2
+    Bnd (var1, t1) cl2 <$> parseLeaf
 
 send :: Parser Proc
 send = do
@@ -99,7 +104,7 @@ receive :: Parser Proc
 receive = do
     chn <- variable
     symbol ">>"
-    var <- variable
+    var <- claim
     symbol "."
     Rec chn var <$> parseLeaf
 
@@ -115,8 +120,55 @@ literal = choice
     , False <$ keyword "false"
     ]
 
-anyKeyword :: Parser ()
-anyKeyword = choice $ keyword <$> keywords
+spiType :: Parser SpiType
+spiType = choice
+    [ boolType
+    , inactionType
+    , qualifiedPretype
+    , betweenRound spiType
+    ]
+
+boolType :: Parser SpiType
+boolType = Boolean <$ keyword "bool"
+
+inactionType :: Parser SpiType
+inactionType = End <$ keyword "end"
+
+qualifiedPretype :: Parser SpiType
+qualifiedPretype = do
+    qual <- qualifier
+    Qualified qual <$> pretype
+
+qualifier :: Parser Qualifier
+qualifier = choice
+    [ Lin <$ keyword "lin"
+    , Un  <$ keyword "un"
+    ]
+
+pretype :: Parser Pretype
+pretype = do
+    oper <- choice
+        [ Sending <$ symbol "!"
+        , Receiving <$ symbol "?"
+        ]
+    valt <- choice
+        [ boolType
+        , inactionType
+        , betweenRound spiType
+        ]
+    symbol "."
+    oper valt <$> spiType
+
+
+claim :: Parser BoundVar
+claim = do
+    var <- variable
+    typ <- try $ do
+        symbol ":"
+        Just <$> spiType
+        <|>
+        return Nothing
+    return (var, typ)
 
 variable :: Parser String
 variable = join (empty <$ try anyKeyword) <|> variable'
@@ -126,7 +178,8 @@ variable' = lexeme $ do
     c <- C.lowerChar
     (c:) <$> many (C.alphaNumChar <|> C.char '_')
 
-
+anyKeyword :: Parser ()
+anyKeyword = choice $ keyword <$> keywords
 
 symbol :: Text -> Parser ()
 symbol sy = void (L.symbol sc sy)

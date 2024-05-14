@@ -4,7 +4,7 @@ import Test.Hspec
 import SessionPi.Parser
 import SessionPi.Language
 
-import Text.Megaparsec (parse, many, some)
+import Text.Megaparsec (parse, some)
 import Data.Either (isLeft)
 
 spec :: Spec
@@ -12,6 +12,7 @@ spec = do
     specLeaves
     specExpr
     specPrepro
+    specTypes
 
 specLeaves :: Spec
 specLeaves = do
@@ -95,18 +96,18 @@ specLeaves = do
 
     describe "Should parse channel binds" $ do
         it "parses a bind " $ do
-            let expected = Right (Bnd "x" "y" Nil)
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) Nil)
             let result = parse bind "test" "x >< y . 0 . end"
             result `shouldBe` expected
 
         it "parses a composed bind and if" $ do
-            let expected = Right (Bnd "x" "falsey" (Brn (Var "x") Nil Nil))
+            let expected = Right (Bnd ("x", Nothing) ("falsey", Nothing) (Brn (Var "x") Nil Nil))
             let result = parse bind "test" "x >< falsey.if x then 0 else 0"
             result `shouldBe` expected
 
     describe "Should parse receive actions" $ do
         it "parses a receive" $ do
-            let expected = Right (Rec "x" "y" Nil)
+            let expected = Right (Rec "x" ("y", Nothing) Nil)
             let result = parse receive "test" "x >> y .0"
             result `shouldBe` expected
 
@@ -141,23 +142,23 @@ specExpr = do
 
         it "parses a complex pipe" $ do
             let result = parse processExpr "test" "{x >< y .0} | if true then 0 | 0 else 0"
-            let expected = Right (Par (Bnd "x" "y" Nil) (Brn (Lit True) (Par Nil Nil) Nil))
+            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) Nil) (Brn (Lit True) (Par Nil Nil) Nil))
             result `shouldBe` expected
 
     describe "Should parse composed propcesses" $ do
         it "parses a simple process" $ do
             let result = parse process "test" "x >< y . x << true . 0"
-            let expected = Right (Bnd "x" "y" (Snd "x" (Lit True) Nil))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil))
             result `shouldBe` expected
 
         it "parses two communicating processes with right par oper priority" $ do
             let result = parse process "test" "x >< y . x << true . 0 | y >> g . if g then 0 else 0"
-            let expected = Right (Par (Bnd "x" "y" (Snd "x" (Lit True) Nil)) (Rec "y" "g" (Brn (Var "g") Nil Nil)))
+            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil)) (Rec "y" ("g", Nothing) (Brn (Var "g") Nil Nil)))
             result `shouldBe` expected
 
         it "parses two communicating processes" $ do
             let result = parse process "test" "x >< y . {x << true . 0 | y >> g . if g then 0 else 0}"
-            let expected = Right (Bnd "x" "y" (Par (Snd "x" (Lit True) Nil) (Rec "y" "g" (Brn (Var "g") Nil Nil))))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec "y" ("g", Nothing) (Brn (Var "g") Nil Nil))))
             result `shouldBe` expected
 
 
@@ -165,11 +166,62 @@ specPrepro = do
     describe "Should preprocess correctly" $ do
         it "parses and lifts a channel bind" $ do
             let result = parse process "test" "x >< y . 0 | 0"
-            let expected = Right (Bnd "x" "y" (Par Nil Nil))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par Nil Nil))
             (preprocess <$> result) `shouldBe` expected
 
         it "parses and lifts all channel binds" $ do
             let result = parse process "test"
                     "x >< y . 0 | z >< w . 0 | {a >< b . 0}| 0"
-            let expected = Right (Bnd "x" "y" (Bnd "z" "w" (Bnd "a" "b" (Par Nil (Par Nil (Par Nil Nil))))))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Bnd ("z", Nothing) ("w", Nothing) (Bnd ("a", Nothing) ("b", Nothing) (Par Nil (Par Nil (Par Nil Nil))))))
             (preprocess <$> result) `shouldBe` expected
+
+specTypes = do
+    describe "Should parse terminal types" $ do
+        it "parses the boolean type" $ do
+            let result = parse boolType "test" "bool"
+            let expected = Right Boolean
+            result `shouldBe` expected
+        
+        it "parses the end type" $ do
+            let result = parse inactionType "test" "end"
+            let expected = Right End
+            result `shouldBe` expected
+    
+    describe "Should parse qualifiers" $ do
+        it "parses the linear qualifier" $ do
+            let result = parse qualifier "test" "lin"
+            let expected = Right Lin
+            result `shouldBe` expected
+
+        it "parses the unbounded qualifier" $ do
+            let result = parse qualifier "test" "un end"
+            let expected = Right Un
+            result `shouldBe` expected
+        
+    describe "Should parse pretypes" $ do
+        it "parses a sending bool then end pretype" $ do
+            let result = parse pretype "test" "!bool .end"
+            let expected = Right (Sending Boolean End)
+            result `shouldBe` expected
+        
+        it "parses an (illtyped) receiving end then bool" $ do
+            let result = parse pretype "test" "?end. (bool)"
+            let expected = Right (Receiving End Boolean)
+            result `shouldBe` expected
+
+    describe "Should parse claims" $ do
+        it "parses a linear channel sending a boolean and then ends" $ do
+            let result = parse claim "test" "x: lin !bool .end"
+            let expected = Right ("x", Just (Qualified Lin (Sending Boolean End)))
+            result `shouldBe` expected
+
+        it "parses an unbounded channel sending a channel and then receiving another channel" $ do
+            let result = parse claim "test" "x: un! (lin !bool .end) .lin? (un? bool .end).end"
+            let expected = Right ("x", Just (Qualified Un 
+                    (Sending 
+                        (Qualified Lin (Sending Boolean End))
+                        (Qualified Lin (Receiving 
+                            (Qualified Un (Receiving Boolean End))
+                            End)))
+                    ))
+            result `shouldBe` expected

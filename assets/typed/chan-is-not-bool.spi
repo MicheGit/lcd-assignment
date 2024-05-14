@@ -1,0 +1,3 @@
+x1 >< x2: bool . if x1 
+    then 0 
+    else 0

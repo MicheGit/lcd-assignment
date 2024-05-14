@@ -3,8 +3,8 @@ import Control.Exception (throw)
 import Control.Concurrent (MVar, putMVar, takeMVar, newEmptyMVar, myThreadId, forkFinally)
 
 import SessionPi.Language
-import Data.HashMap.Lazy (HashMap, insert, (!?), empty)
 import Text.Printf (printf)
+import Data.Map (Map, insert, (!?))
 
 data ChannelEnd where
     ReadEnd :: (MVar Val) -> (MVar ()) -> ChannelEnd
@@ -25,11 +25,11 @@ receive _ = throw $ userError "Tried to send on a write end of a channel"
 
 run :: Proc -> IO ()
 run =
-    let ?channels = empty
-        ?variables = empty
+    let ?channels = mempty
+        ?variables = mempty
      in run'
 
-type ProcIO a = (?channels :: HashMap String ChannelEnd, ?variables :: HashMap String Val) => IO a
+type ProcIO a = (?channels :: Map String ChannelEnd, ?variables :: Map String Val) => IO a
 
 run' :: Proc -> ProcIO ()
 run' Nil = do
@@ -63,13 +63,13 @@ run' (Snd x v p) = do
     chan `send` val
     logInfo "VALUE SENT"
     run' p
-run' (Rec x y p) = do
+run' (Rec x (y, _) p) = do
     logInfo (printf "RECEIVING value %s over channel %s" y x)
     chan <- channel x
     val <- receive chan
     logInfo (printf "RECEIVED value %s" (show val))
     let ?variables = insert y val ?variables in run' p
-run' (Bnd x y p) = do
+run' (Bnd (x, _) (y, _) p) = do
     logInfo (printf "BINDING channel ends %s and %s" x y)
     var <- newEmptyMVar
     lock <- newEmptyMVar

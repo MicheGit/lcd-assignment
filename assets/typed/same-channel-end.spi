@@ -1,0 +1,1 @@
+x1 >< x2: lin? bool.end . x1 << true . 0 | x1 >> y . 0

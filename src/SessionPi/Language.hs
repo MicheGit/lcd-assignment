@@ -2,22 +2,25 @@ module SessionPi.Language where
 
 import qualified Data.Set as S
 import qualified Data.Map as M
-import qualified Data.Map as M
 import Data.Maybe (fromJust)
+import Control.Parallel.Strategies (runEval, evalList, rdeepseq, using)
+import Data.Either (isRight)
 
 data Proc where
     Snd :: String -> Val -> Proc -> Proc
-    Rec :: String -> String -> Proc -> Proc
+    Rec :: String -> BoundVar -> Proc -> Proc
     Par :: Proc -> Proc -> Proc
     Brn :: Val -> Proc -> Proc -> Proc
     Nil :: Proc
-    Bnd :: String -> String -> Proc -> Proc
+    Bnd :: BoundVar -> BoundVar -> Proc -> Proc
     deriving (Show, Eq)
 
 data Val where
     Var :: String -> Val
     Lit :: Bool -> Val
     deriving (Show, Eq)
+
+type BoundVar = (String, Maybe SpiType) -- type declaration is optional
 
 isVar :: Val -> Bool
 isVar (Var _) = True
@@ -35,7 +38,7 @@ unlit :: Val -> Bool
 unlit (Lit l) = l
 unlit _ = undefined
 
-class Expr a where
+{- class Expr a where
     fv :: a -> S.Set String
     substitute :: a -> Val -> String -> a
 
@@ -84,7 +87,7 @@ instance Expr Proc where
             -- y' = y -- perché non è una fv
             -- z' = z -- perché non è una fv
             p'  | x == z || x == y  = p
-                | otherwise         = substitute p v x
+                | otherwise         = substitute p v x -}
 
 -- bind is active in all parallel branches by definition, equivalently here we lift it to the parent node
 -- inefficiente ma vabbè
@@ -148,16 +151,86 @@ ndsplit ctx =
         lins :: [Context]
         lins =
             (M.fromArgSet <$>) $
-            S.toList $       -- for all the       -- for all the       -- for all the       -- for all the
+            S.toList $       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the
                    -- for all the
-            S.powerSet $     -- possible combination of     -- possible combination of     -- possible combination of
-            M.argSet lin     -- (entries typed with) linearly qualified types
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the
+                   -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the
+            S.powerSet $     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of     -- possible combination of
+            M.argSet lin     -- (claims with) linearly qualified types
 
      in [(unr `M.union` comb, unr `M.union` (lin `M.difference` comb)) | comb <- lins]
      -- all possible splits
 
-insert :: String -> SpiType ->  Context -> Context
-insert k t ctx
+update :: String -> SpiType ->  Context -> Context
+update k t ctx
     | not (k `M.member` ctx) = M.insert k t ctx
-    | fromJust (M.lookup k ctx) == t = ctx -- we let go unrestricted types to be reinserted
+    | fromJust (M.lookup k ctx) == t = ctx -- we let go unrestricted types to be claimed multiple times
     | otherwise              = error "Tryed to update a contex with a yet existing variable or to reintroduce a linear variable"
+
+type Claim = (Val, SpiType)
+
+type TypeErrorBundle = String
+
+class TypeCheck a where
+    -- TODO better errors
+    typeCheck :: Context -> a -> Either TypeErrorBundle ()
+
+instance TypeCheck Claim where
+    typeCheck :: Context -> Claim -> Either TypeErrorBundle ()
+    typeCheck ctx (Lit _, Boolean)
+        | unrestricted ctx = Right ()
+        | otherwise        = Left "Failed to type context, there are unused linear channels"
+    typeCheck ctx (Var x, t)
+        | M.lookup x ctx == Just t && unrestricted ctx = Right ()
+        | not $ unrestricted ctx                       = Left "Failed to type context, there are unused linear channels"
+        | otherwise                                    = Left "Variable not found or differently typed in contex"
+    typeCheck _ _                                      = Left "Ill typed variable"
+
+instance TypeCheck Proc where
+    typeCheck :: Context -> Proc -> Either TypeErrorBundle ()
+    typeCheck ctx Nil
+        | unrestricted ctx = Right ()
+        | otherwise        = Left "Failed to type context, there are unused linear channels"
+    typeCheck ctx (Par p1 p2) =
+        let splits = ndsplit ctx
+            candidates = (\(ctx1, ctx2) -> do
+                typeCheck ctx1 p1
+                typeCheck ctx2 p2) <$> splits
+            result = candidates `using` evalList rdeepseq
+         in if any isRight result
+            then Right ()
+            else Left "No context could type the requested process"
+    
+
+
+
+
+
