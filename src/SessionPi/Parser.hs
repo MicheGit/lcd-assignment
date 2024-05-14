@@ -45,7 +45,9 @@ keywords =
 
 
 process :: Parser Proc
-process = processExpr
+process = do
+    try sc -- trailing spaces and comments
+    processExpr
 
 processLeaves :: [Parser Proc]
 processLeaves =
@@ -104,7 +106,7 @@ receive :: Parser Proc
 receive = do
     chn <- variable
     symbol ">>"
-    var <- claim
+    var <- variable
     symbol "."
     Rec chn var <$> parseLeaf
 

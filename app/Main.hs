@@ -3,7 +3,7 @@ module Main (main) where
 import System.Environment (getArgs)
 import Control.Exception (throw)
 
-import SessionPi.Language (Proc, preprocess)
+import SessionPi.Language (Proc, preprocess, typeCheck)
 import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
 
@@ -22,7 +22,13 @@ getParsedProgram = do
     filecontent <- readFile filename
     let result = parseProcess filename filecontent
     case result of
-        Right program -> return (preprocess program)
+        Right program -> do
+            let check = typeCheck mempty (preprocess program)
+            case check of
+                Right () -> do
+                    print "Typecheck successful!"
+                    return program
+                Left error -> throw $ userError error
         Left err -> do
             print err
             throw $ userError "Syntax Error"

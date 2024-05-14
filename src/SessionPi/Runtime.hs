@@ -63,7 +63,7 @@ run' (Snd x v p) = do
     chan `send` val
     logInfo "VALUE SENT"
     run' p
-run' (Rec x (y, _) p) = do
+run' (Rec x y p) = do
     logInfo (printf "RECEIVING value %s over channel %s" y x)
     chan <- channel x
     val <- receive chan

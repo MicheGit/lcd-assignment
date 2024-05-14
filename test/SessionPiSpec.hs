@@ -107,7 +107,7 @@ specLeaves = do
 
     describe "Should parse receive actions" $ do
         it "parses a receive" $ do
-            let expected = Right (Rec "x" ("y", Nothing) Nil)
+            let expected = Right (Rec "x" "y" Nil)
             let result = parse receive "test" "x >> y .0"
             result `shouldBe` expected
 
@@ -153,12 +153,12 @@ specExpr = do
 
         it "parses two communicating processes with right par oper priority" $ do
             let result = parse process "test" "x >< y . x << true . 0 | y >> g . if g then 0 else 0"
-            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil)) (Rec "y" ("g", Nothing) (Brn (Var "g") Nil Nil)))
+            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil)) (Rec "y" "g" (Brn (Var "g") Nil Nil)))
             result `shouldBe` expected
 
         it "parses two communicating processes" $ do
             let result = parse process "test" "x >< y . {x << true . 0 | y >> g . if g then 0 else 0}"
-            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec "y" ("g", Nothing) (Brn (Var "g") Nil Nil))))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec "y" "g" (Brn (Var "g") Nil Nil))))
             result `shouldBe` expected
 
 

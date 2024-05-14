@@ -1,0 +1,4 @@
+x >< y : lin? bool.end .
+    { x << true . 0
+    | y >> b . if b then 0 else 0
+    }

@@ -1,0 +1,6 @@
+x >< y: lin? bool .lin? bool .end . -- doesn't type since both channels are linear and are used in two different processes
+    { x << true . y >> z . if z then 0 else 0
+    | y >> z . if z
+        then x << false . 0
+        else 0
+    }

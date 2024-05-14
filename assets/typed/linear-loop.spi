@@ -1,0 +1,7 @@
+-- should type with the type system given until end of chapter 3
+-- but still go into deadlock
+x1 >< x2: lin? (lin! bool.end ).end .
+    y1 >< y2: lin? bool.end. 
+        { x1 << y1 . 0
+        | x2 >> z . z << true . y2 >> w . 0
+        }
