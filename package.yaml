@@ -45,6 +45,7 @@ default-extensions:
 - RankNTypes
 - InstanceSigs
 - FlexibleInstances
+- TupleSections
 
 library:
   source-dirs: src
