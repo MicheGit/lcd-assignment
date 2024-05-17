@@ -4,7 +4,7 @@ import SessionPi.Language
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Applicative (Alternative(empty, (<|>)))
-import Control.Monad (when, unless)
+import Control.Monad (when, unless, void)
 import Control.Parallel.Strategies (using, evalList, rdeepseq)
 import Text.Megaparsec (choice)
 import Text.Printf (printf)
@@ -109,9 +109,7 @@ ndsplit ctx =
      -- and distribute linear channels in the two results
 
 member :: String -> CT Bool
-member k = CT (do
-    mem <- M.member k
-    return . (mem,))
+member = fromFunction . M.member
 
 get :: String -> CT SpiType
 get k = do
@@ -124,17 +122,19 @@ replace :: String -> SpiType -> CT ()
 replace k = liftS . M.insert k
 
 update :: String -> SpiType -> CT ()
-update k t = do -- TODO si possono rimettere gli unrestricted
-    found <- get k <|> CT (unwrap (pure t) <$> M.insert k t)
-    when (found /= t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
+update k t = do
+    may <- fromFunction (M.lookup k)
+    case may of
+        Just found -> unless (found == t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
+        Nothing    -> liftS (M.insert k t)
 
 delete :: String -> CT ()
-delete k = CT (return . ((),) . M.delete k)
+delete = liftS . M.delete
 
 extract :: String -> CT SpiType
 extract k = do
     t <- get k
-    t <$ when (unrestricted t) (delete k)
+    t <$ unless (unrestricted t) (delete k)
 
 require :: (Context -> Bool) -> TypeErrorBundle -> CT ()
 require predicate e = do

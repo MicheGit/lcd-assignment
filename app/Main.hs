@@ -29,10 +29,7 @@ getParsedProgram = do
                 Right () -> do
                     print "Typecheck successful!"
                     return program
-                Left error -> do
-                    print "Typecheck error"
-                    print error
-                    throw $ userError error
+                Left error -> throw $ userError error
         Left err -> do
             print err
             throw $ userError "Syntax Error"
