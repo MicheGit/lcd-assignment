@@ -4,11 +4,13 @@ import SessionPi.Language
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Applicative (Alternative(empty, (<|>)))
-import Control.Monad (unless, guard)
-import GHC.Base (when)
+import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, evalList, rdeepseq)
 import Text.Megaparsec (choice)
-import ForkJoin (forkJoin)
+import Text.Printf (printf)
+
+typeCheck :: Proc -> Either TypeErrorBundle ()
+typeCheck p = fst <$> unwrap (check p) mempty
 
 type Context = M.Map String SpiType
 
@@ -50,8 +52,46 @@ liftS f = CT (do
     c' <- f
     return (return ((), c')))
 
+fromEither :: Either TypeErrorBundle a -> CT a
+fromEither = liftC . const
+
+throwError :: TypeErrorBundle -> CT a
+throwError e = CT (\c -> do
+    Left (printf "Error: %s\n\t within context: %s" e (show c)))
+
+fromFunction :: (Context -> a) -> CT a
+fromFunction = liftC . (return .)
+
+ctId :: CT Context
+ctId = liftC return
+
+overrideWith :: Context -> CT ()
+overrideWith = liftS . const
+
+(|>) :: Context -> CT () -> CT ()
+c |> ct = overrideWith c >> ct
+
+(-<) :: CT () -> [CT ()] -> CT [Either TypeErrorBundle ()]
+ct -< cts = do
+    ct
+    CT (\c -> do
+        let d = fmap ((fst <$>) . ($ c) . unwrap) cts
+        return (d, c))
+
+(>-) :: CT [Either TypeErrorBundle ()] -> CT () -> CT ()
+cts >- ct = do
+    let evalIndependently = foldl (>>) (Right ()) . (`using` evalList rdeepseq)
+    res <- evalIndependently <$> cts
+    fromEither res >> ct
+
+detach :: [CT ()] -> CT ()
+detach cts = return () -< cts >- return ()
+
 getUnrestricted :: Context -> Context
 getUnrestricted = M.filter unrestricted
+
+dropLinear :: CT ()
+dropLinear = liftS getUnrestricted
 
 ndsplit :: Context -> [(Context, Context)]
 ndsplit ctx | M.size ctx == 0 = [(mempty, mempty)]
@@ -74,21 +114,19 @@ member k = CT (do
     return . (mem,))
 
 get :: String -> CT SpiType
-get k = CT (do
-    res <- M.lookup k
-    case res of
-        Just t -> return . (t,)
-        Nothing-> Left . (("(The variable " ++ k ++ " was not found in context=") ++) . show)
+get k = do
+    r <- fromFunction (M.lookup k)
+    case r of
+        Just t -> return t
+        Nothing-> throwError (printf "Variable %s not defined" k)
 
 replace :: String -> SpiType -> CT ()
 replace k = liftS . M.insert k
 
 update :: String -> SpiType -> CT ()
-update k t = do
+update k t = do -- TODO si possono rimettere gli unrestricted
     found <- get k <|> CT (unwrap (pure t) <$> M.insert k t)
-    guard (found == t)
-    -- TODO <|>
-    -- throwError
+    when (found /= t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
 
 delete :: String -> CT ()
 delete k = CT (return . ((),) . M.delete k)
@@ -98,15 +136,13 @@ extract k = do
     t <- get k
     t <$ when (unrestricted t) (delete k)
 
-require :: (Context -> Bool) -> (Context -> TypeErrorBundle) -> CT ()
-require p pp = CT (do
-    g <- p
-    if g
-        then Right . ((),)
-        else Left . pp)
+require :: (Context -> Bool) -> TypeErrorBundle -> CT ()
+require predicate e = do
+    g <- fromFunction predicate
+    unless g $ throwError e
 
 unGamma :: CT ()
-unGamma = require unrestricted (("Failed to type context, there are unused linear channels ctx=" ++) . show)
+unGamma = require unrestricted "Failed to type context, there are unused linear channels"
 
 type Claim = (Val, SpiType)
 
@@ -119,99 +155,43 @@ instance TypeCheck Claim where
     check (Lit _, Boolean) = unGamma
     check (Var x, t) = do
         found <- get x
-        guard (found == t) -- TODO <|> error
+        when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
         unGamma
-    check _ = empty -- TODO error
-
+    check _ = throwError "Tryed to check a literal with a channel type"
 
 instance TypeCheck Proc where
     check :: Proc -> CT ()
     check Nil = unGamma
-    check (Par p1 p2) = liftC $ do
-        splits <- ndsplit
-        let candidates = (\(c1, c2) -> do
-                unwrap (check p1) c1
-                unwrap (check p2) c2
-                return ()) <$> splits
-        return (choice (candidates `using` evalList rdeepseq))
-        
+    check (Par p1 p2) = do
+        splits <- liftC (return . ndsplit)
+        let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ] 
+        candidates <- return () -< (uncurry cand <$> splits)
+        fromEither $ choice (candidates `using` evalList rdeepseq)
     check (Bnd (x, Just tx) (y, Just ty) p) = do
         update x tx
         update y ty
         check p
-    check (Bnd {}) = empty -- TODO error
-    check (Brn g p1 p2) = CT (do
-        res1 <- unwrap (check (g, Boolean)) . getUnrestricted
-        res2 <- unwrap (check p1)
-        res3 <- unwrap (check p2)
-        (\c -> do
-            res1
-            res2
-            res3
-            return ((), c)))
+    check (Bnd {}) = throwError "Bind without annotations"
+    check (Brn g p1 p2) = detach 
+        [ dropLinear >> check (g, Boolean)
+        , check p1
+        , check p2
+        ]
     check (Rec x y p) = do
         (t, u) <- extract x >>= \case
                 Qualified _ (Receiving t u) -> return (t, u)
-                _ -> empty -- TODO error
+                left -> throwError (printf "Receive channel %s typed against unmatching type: %s is not a qualified receiving pretype" x (show left))
         update x u
         replace y t
         check p
     check (Snd x v p) = do
         (t, u) <- extract x >>= \case
                 Qualified _ (Sending t u) -> return (t, u)
-                _ -> empty -- TODO error
+                left -> throwError (printf "Send channel %s typed against unmatching type: %s is not a qualified sending pretype" x (show left))
         case (v, t) of
                 (Var y, Qualified Lin _) -> do
                     t' <- extract y
-                    when (t /= t') empty -- TODO error
-                _ -> CT (do
-                    res1 <- unwrap (check (v, t)) . getUnrestricted
-                    (\c -> do
-                        res1
-                        return ((), c)))
+                    when (t /= t') $ throwError (printf "Variable %s with type $s in context was typed against an unmatching type %s" x (show t) (show t'))
+                _ -> detach [ dropLinear >> check (v, t) ]
         update x u
         check p
-    
--- typeCheck' :: Context -> Proc -> Either TypeErrorBundle ()
--- typeCheck' ctx Nil
---     | unrestricted ctx = Right ()
---     | otherwise        = Left ("Failed to type context, there are unused linear channels ctx=" ++ show ctx)
--- typeCheck' ctx (Par p1 p2) =
---     let splits = ndsplit ctx
---         candidates = (\(ctx1, ctx2) -> do
---             typeCheck' ctx1 p1
---             typeCheck' ctx2 p2) <$> splits
---         result = candidates `using` evalList rdeepseq
---         in if any isRight result
---         then Right ()
---         else Left ("No context split could type the requested process\n" ++ show splits ++ "\n" ++ show ctx)
--- typeCheck' ctx (Bnd (x, Just tx) (y, Just ty) p) = typeCheck' (update x tx $ update y ty ctx) p
--- typeCheck' _   (Bnd {}) = Left "Bind without type annotations"
--- typeCheck' ctx (Brn g p1 p2) = do -- here we can optimize and not rely on parallelization
---     let guardCtx = getUnrestricted ctx -- the only context that could type a boolean variable is unrestricted
---     typeCheck' guardCtx (g, Boolean)
---     typeCheck' ctx p1
---     typeCheck' ctx p2
--- typeCheck' ctx (Rec x y p) = do            -- here we can optimize
---     (ctx', t, u) <- case extract x ctx of    -- if there is not, error
---             Just (c, Qualified _ (Receiving t u)) -> Right (c, t, u)
---             _                                       -> Left "Receiving channel not defined or ill-defined"
---     -- ctx types channel x
---     -- no need to check for unrestrictedness of gamma1
---     -- as gamma2 we just need to use ctx'
---     typeCheck' (M.insert y t $ update x u ctx') p
--- typeCheck' ctx (Snd x v p) = do -- similar to recceive we can optimize
---     (ctx', t, u) <- case extract x ctx of    -- if there is not, error
---             Just (c, Qualified _ (Sending t u)) -> Right (c, t, u)
---             Nothing -> Left ("Sending channel not defined"  ++ x ++ " ctx=" ++ show ctx)
---             _ -> Left ("Sending channel ill defined" ++ x ++ " ctx=" ++ show ctx)
---     ctx'' <- case (v, t) of
---             (Var y, Qualified Lin _) -> case extract y ctx' of
---                     Just (c, t') -> if t == t'
---                         then Right c
---                         else Left "Inconsistent types"
---                     Nothing -> Left "Undefined linear channel"
---             _ -> do
---                 typeCheck' (getUnrestricted ctx') (v, t)
---                 Right ctx'
---     typeCheck' (update x u ctx'') p
