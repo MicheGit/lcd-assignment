@@ -53,6 +53,7 @@ library
     , megaparsec
     , parallel
     , text
+    , time
   default-language: Haskell2010
 
 executable lcd-assignment-exe
@@ -80,6 +81,7 @@ executable lcd-assignment-exe
     , megaparsec
     , parallel
     , text
+    , time
   default-language: Haskell2010
 
 test-suite lcd-assignment-test
@@ -110,4 +112,5 @@ test-suite lcd-assignment-test
     , megaparsec
     , parallel
     , text
+    , time
   default-language: Haskell2010

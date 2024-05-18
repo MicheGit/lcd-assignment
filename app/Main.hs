@@ -23,13 +23,14 @@ getParsedProgram = do
     filecontent <- readFile filename
     let result = parseProcess filename filecontent
     case result of
-        Right program -> do
-            let check = typeCheck (preprocess program)
+        Right raw -> do
+            let program = preprocess raw
+                check = typeCheck program
             case check of
                 Right () -> do
                     print "Typecheck successful!"
                     return program
-                Left error -> throw $ userError error
+                Left err -> throw $ userError err
         Left err -> do
             print err
             throw $ userError "Syntax Error"

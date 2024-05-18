@@ -4,10 +4,22 @@ import SessionPi.Language
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Applicative (Alternative(empty, (<|>)))
-import Control.Monad (when, unless, void)
+import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, evalList, rdeepseq)
 import Text.Megaparsec (choice)
 import Text.Printf (printf)
+
+foldChoice :: [Either a b] -> Either [a] b
+foldChoice [] = Left []
+foldChoice (e:es) = case e of
+    Right r -> Right r
+    Left  l -> case foldChoice es of
+            Right r -> Right r
+            Left ls -> Left (l:ls)
+
+mapLeft :: (a -> a') -> Either a b -> Either a' b
+mapLeft f (Left l) = Left (f l)
+mapLeft _ (Right r) = Right r
 
 typeCheck :: Proc -> Either TypeErrorBundle ()
 typeCheck p = fst <$> unwrap (check p) mempty
@@ -30,7 +42,7 @@ instance Applicative CT where
     pure x = CT (\c -> Right (x, c))
     CT fn <*> CT fa = CT (\c -> do
         (f, c')  <- fn c
-        (a, c'') <- fa c' 
+        (a, c'') <- fa c'
         return (f a, c''))
 
 instance Monad CT where
@@ -43,12 +55,12 @@ instance Alternative CT where
   CT fa <|> CT fb = CT (\c -> fa c <|> fb c)
 
 liftC :: (Context -> Either TypeErrorBundle a) -> CT a
-liftC f = CT (\c -> do 
+liftC f = CT (\c -> do
     a <- f c
     return (a, c))
 
-liftS :: (Context -> Context) -> CT ()
-liftS f = CT (do
+sideEffect :: (Context -> Context) -> CT ()
+sideEffect f = CT (do
     c' <- f
     return (return ((), c')))
 
@@ -59,14 +71,14 @@ throwError :: TypeErrorBundle -> CT a
 throwError e = CT (\c -> do
     Left (printf "Error: %s\n\t within context: %s" e (show c)))
 
-fromFunction :: (Context -> a) -> CT a
-fromFunction = liftC . (return .)
+runPure :: (Context -> a) -> CT a
+runPure = liftC . (return .)
 
 ctId :: CT Context
 ctId = liftC return
 
 overrideWith :: Context -> CT ()
-overrideWith = liftS . const
+overrideWith = sideEffect . const
 
 (|>) :: Context -> CT () -> CT ()
 c |> ct = overrideWith c >> ct
@@ -91,7 +103,7 @@ getUnrestricted :: Context -> Context
 getUnrestricted = M.filter unrestricted
 
 dropLinear :: CT ()
-dropLinear = liftS getUnrestricted
+dropLinear = sideEffect getUnrestricted
 
 ndsplit :: Context -> [(Context, Context)]
 ndsplit ctx | M.size ctx == 0 = [(mempty, mempty)]
@@ -109,27 +121,27 @@ ndsplit ctx =
      -- and distribute linear channels in the two results
 
 member :: String -> CT Bool
-member = fromFunction . M.member
+member = runPure . M.member
 
 get :: String -> CT SpiType
 get k = do
-    r <- fromFunction (M.lookup k)
+    r <- runPure (M.lookup k)
     case r of
         Just t -> return t
         Nothing-> throwError (printf "Variable %s not defined" k)
 
 replace :: String -> SpiType -> CT ()
-replace k = liftS . M.insert k
+replace k = sideEffect . M.insert k
 
 update :: String -> SpiType -> CT ()
 update k t = do
-    may <- fromFunction (M.lookup k)
+    may <- runPure (M.lookup k)
     case may of
         Just found -> unless (found == t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
-        Nothing    -> liftS (M.insert k t)
+        Nothing    -> sideEffect (M.insert k t)
 
 delete :: String -> CT ()
-delete = liftS . M.delete
+delete = sideEffect . M.delete
 
 extract :: String -> CT SpiType
 extract k = do
@@ -138,7 +150,7 @@ extract k = do
 
 require :: (Context -> Bool) -> TypeErrorBundle -> CT ()
 require predicate e = do
-    g <- fromFunction predicate
+    g <- runPure predicate
     unless g $ throwError e
 
 unGamma :: CT ()
@@ -163,16 +175,19 @@ instance TypeCheck Proc where
     check :: Proc -> CT ()
     check Nil = unGamma
     check (Par p1 p2) = do
-        splits <- liftC (return . ndsplit)
-        let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ] 
-        candidates <- return () -< (uncurry cand <$> splits)
-        fromEither $ choice (candidates `using` evalList rdeepseq)
+        splits <- runPure ndsplit
+        let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ]
+        runs <- return () -< (uncurry cand <$> splits)
+        let results = runs `using` evalList rdeepseq
+            outcome = foldChoice results
+            ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
+        fromEither (mapLeft ppsplit outcome)
     check (Bnd (x, Just tx) (y, Just ty) p) = do
         update x tx
         update y ty
         check p
     check (Bnd {}) = throwError "Bind without annotations"
-    check (Brn g p1 p2) = detach 
+    check (Brn g p1 p2) = detach
         [ dropLinear >> check (g, Boolean)
         , check p1
         , check p2

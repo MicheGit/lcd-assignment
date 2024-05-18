@@ -5,6 +5,8 @@ import Control.Concurrent (MVar, putMVar, takeMVar, newEmptyMVar, myThreadId, fo
 import SessionPi.Language
 import Text.Printf (printf)
 import Data.Map (Map, insert, (!?))
+import Data.Time.Clock (getCurrentTime)
+import Data.Time.Format (formatTime, defaultTimeLocale)
 
 data ChannelEnd where
     ReadEnd :: (MVar Val) -> (MVar ()) -> ChannelEnd
@@ -92,7 +94,8 @@ eval = \case
 logInfo :: String -> ProcIO ()
 logInfo s = do
     pid <- myThreadId
-    printf "%s: [%s]\n" (show pid) s
+    now <- getCurrentTime
+    printf "[%s | %s]: %s\n" (formatTime defaultTimeLocale "%Y/%m/%d %H:%M:%S.%9q" now) (show pid) s
 
 notifyThreadEnd :: Show tres => MVar () -> tres -> ProcIO ()
 notifyThreadEnd endvar result = do

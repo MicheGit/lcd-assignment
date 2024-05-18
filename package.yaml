@@ -25,6 +25,7 @@ dependencies:
 - text
 - containers
 - parallel
+- time
 
 ghc-options:
 - -Wall
