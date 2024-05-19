@@ -47,6 +47,8 @@ default-extensions:
 - InstanceSigs
 - FlexibleInstances
 - TupleSections
+- DefaultSignatures
+- DeriveAnyClass
 
 library:
   source-dirs: src

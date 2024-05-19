@@ -1,4 +1,4 @@
-module SessionPiSpec (spec) where
+module ParserSpec (spec) where
 import Test.Hspec
 
 import SessionPi.Parser

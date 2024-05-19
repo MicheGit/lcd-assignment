@@ -1,10 +1,5 @@
 module SessionPi.Language where
-
 import qualified Data.Set as S
-import qualified Data.Map as M
-import Data.Maybe (fromJust)
-import Control.Parallel.Strategies (evalList, rdeepseq, using)
-import Data.Either (isRight)
 
 data Proc where
     Snd :: String -> Val -> Proc -> Proc
@@ -107,28 +102,40 @@ preprocess (Rec x y p) = Rec x y (preprocess p)
 preprocess (Bnd x y p) = Bnd x y (preprocess p)
 preprocess (Brn g p1 p2) = Brn g (preprocess p1) (preprocess p2)
 
+-- TYPES
+
+class Bisimulation a where
+    bisim :: S.Set (String, String) -> a -> a -> Bool
+    default bisim :: (Eq a) => S.Set (String, String) -> a -> a -> Bool
+    bisim _ = (==)
+    (~) :: a -> a -> Bool
+    (~) = bisim S.empty
 
 data Qualifier where
     Lin :: Qualifier
     Un  :: Qualifier
-    deriving (Show, Eq)
+    deriving (Show, Eq, Bisimulation)
 
 data Pretype where
     Receiving :: SpiType -> SpiType -> Pretype
     Sending   :: SpiType -> SpiType -> Pretype
-    deriving (Show, Eq)
+    deriving (Show, Eq, Bisimulation)
 
 data SpiType where
     Boolean   :: SpiType
     End       :: SpiType
     Qualified :: Qualifier -> Pretype -> SpiType
-    deriving (Show, Eq)
+    TypeVar   :: String -> SpiType
+    Recursive :: String -> SpiType -> SpiType
+    deriving (Show, Eq) -- intensional equality defined here
 
 dualType :: SpiType -> SpiType
 dualType End = End
-dualType Boolean = error "Duality is undefinde for boolean. Perhaps you tried to type a process as a boolean?"
+dualType Boolean = error "Duality is undefined for the bool type. Perhaps you tried to type a process as a boolean?"
 dualType (Qualified q (Receiving t1 t2)) = Qualified q (Sending t1 (dualType t2))
 dualType (Qualified q (Sending t1 t2)) = Qualified q (Receiving t1 (dualType t2))
+dualType (Recursive a p) = Recursive a (dualType p)
+dualType (TypeVar x) = TypeVar x
 
 class Unrestricted t where
     unrestricted :: t -> Bool
@@ -141,3 +148,17 @@ instance Unrestricted SpiType where
 instance (Unrestricted t, Foldable f) => Unrestricted (f t) where
     unrestricted :: f t -> Bool
     unrestricted = all unrestricted
+
+subsType :: String -> SpiType -> SpiType -> SpiType
+subsType x t (TypeVar y) | x == y = t
+subsType x t (Qualified q (Sending t1 t2)) = Qualified q (Sending (subsType x t t1) (subsType x t t2))
+subsType x t (Qualified q (Receiving t1 t2)) = Qualified q (Receiving (subsType x t t1) (subsType x t t2))
+subsType _ _ t = t
+
+instance Bisimulation SpiType where
+    bisim :: S.Set (String, String) -> SpiType -> SpiType -> Bool
+    bisim _ t1 t2 | t1 == t2 = True
+    bisim rel t1 t2 | S.member (show t1, show t2) rel || S.member (show t2, show t1) rel = True
+    bisim rel t1@(Recursive x t) t2 = bisim (S.insert (show t1, show t2) rel) (subsType x t1 t) t2
+    bisim rel t1 t2@(Recursive x t) = bisim (S.insert (show t1, show t2) rel) t1 (subsType x t2 t)
+    bisim _ _ _ = False

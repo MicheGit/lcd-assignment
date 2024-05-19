@@ -25,7 +25,6 @@ source-repository head
 
 library
   exposed-modules:
-      ForkJoin
       Lib
       SessionPi.Language
       SessionPi.Language.Types
@@ -46,6 +45,8 @@ library
       InstanceSigs
       FlexibleInstances
       TupleSections
+      DefaultSignatures
+      DeriveAnyClass
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       base >=4.7 && <5
@@ -73,6 +74,8 @@ executable lcd-assignment-exe
       InstanceSigs
       FlexibleInstances
       TupleSections
+      DefaultSignatures
+      DeriveAnyClass
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
@@ -88,7 +91,8 @@ test-suite lcd-assignment-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      SessionPiSpec
+      LanguageSpec
+      ParserSpec
       Paths_lcd_assignment
   autogen-modules:
       Paths_lcd_assignment
@@ -103,6 +107,8 @@ test-suite lcd-assignment-test
       InstanceSigs
       FlexibleInstances
       TupleSections
+      DefaultSignatures
+      DeriveAnyClass
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
