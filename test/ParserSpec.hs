@@ -6,6 +6,7 @@ import SessionPi.Language
 
 import Text.Megaparsec (parse, some)
 import Data.Either (isLeft)
+import SessionPi.Parser (typeVar, recursiveType)
 
 spec :: Spec
 spec = do
@@ -175,6 +176,7 @@ specPrepro = do
             let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Bnd ("z", Nothing) ("w", Nothing) (Bnd ("a", Nothing) ("b", Nothing) (Par Nil (Par Nil (Par Nil Nil))))))
             (preprocess <$> result) `shouldBe` expected
 
+specTypes :: Spec
 specTypes = do
     describe "Should parse terminal types" $ do
         it "parses the boolean type" $ do
@@ -185,17 +187,6 @@ specTypes = do
         it "parses the end type" $ do
             let result = parse inactionType "test" "end"
             let expected = Right End
-            result `shouldBe` expected
-    
-    describe "Should parse qualifiers" $ do
-        it "parses the linear qualifier" $ do
-            let result = parse qualifier "test" "lin"
-            let expected = Right Lin
-            result `shouldBe` expected
-
-        it "parses the unbounded qualifier" $ do
-            let result = parse qualifier "test" "un end"
-            let expected = Right Un
             result `shouldBe` expected
         
     describe "Should parse pretypes" $ do
@@ -216,12 +207,39 @@ specTypes = do
             result `shouldBe` expected
 
         it "parses an unbounded channel sending a channel and then receiving another channel" $ do
-            let result = parse claim "test" "x: un! (lin !bool .end) .lin? (un? bool .end).end"
+            let result = parse claim "test" "x: un! (lin !bool .end) .un? (un? bool .end).end"
             let expected = Right ("x", Just (Qualified Un 
                     (Sending 
                         (Qualified Lin (Sending Boolean End))
-                        (Qualified Lin (Receiving 
+                        (Qualified Un (Receiving 
                             (Qualified Un (Receiving Boolean End))
                             End)))
                     ))
             result `shouldBe` expected
+    describe "Should parse type variables" $ do
+        it "parses a type variable" $ do
+            let result = parse typeVar "test" "x"
+            let expected = Right (TypeVar "x")
+            result `shouldBe` expected
+        
+        it "doesn't parse a keyword" $ do
+            let result = parse typeVar "test" "rec"
+            result `shouldSatisfy` isLeft
+        
+        it "parses a type variable nested into other types" $ do
+            let result = parse spiType "test" "un! bool. recur"
+            let expected = Right (Qualified Un (Sending Boolean (TypeVar "recur")))
+            result `shouldBe` expected
+
+    describe "Should parse recursive types" $ do
+        it "parses a simple recursive type" $ do
+            let result = parse recursiveType "test" "rec x.x"
+            let expected = Right (Recursive "x" (TypeVar "x"))
+            result `shouldBe` expected
+        
+        it "parses a type always sending a boolean" $ do
+            let result = parse recursiveType "test" "rec x.un! bool.x"
+            let expected = Right (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))))
+            result `shouldBe` expected
+
+        

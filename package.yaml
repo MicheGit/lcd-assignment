@@ -49,6 +49,7 @@ default-extensions:
 - TupleSections
 - DefaultSignatures
 - DeriveAnyClass
+- TypeFamilies
 
 library:
   source-dirs: src

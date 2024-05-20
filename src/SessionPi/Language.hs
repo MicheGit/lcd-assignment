@@ -1,5 +1,6 @@
 module SessionPi.Language where
-import qualified Data.Set as S
+
+import Bisimulation (Bisimulation (behave))
 
 data Proc where
     Snd :: String -> Val -> Proc -> Proc
@@ -104,22 +105,16 @@ preprocess (Brn g p1 p2) = Brn g (preprocess p1) (preprocess p2)
 
 -- TYPES
 
-class Bisimulation a where
-    bisim :: S.Set (String, String) -> a -> a -> Bool
-    default bisim :: (Eq a) => S.Set (String, String) -> a -> a -> Bool
-    bisim _ = (==)
-    (~) :: a -> a -> Bool
-    (~) = bisim S.empty
-
 data Qualifier where
     Lin :: Qualifier
     Un  :: Qualifier
-    deriving (Show, Eq, Bisimulation)
+    deriving (Show, Eq, Ord)
 
 data Pretype where
     Receiving :: SpiType -> SpiType -> Pretype
     Sending   :: SpiType -> SpiType -> Pretype
-    deriving (Show, Eq, Bisimulation)
+    deriving (Show, Eq, Ord)
+
 
 data SpiType where
     Boolean   :: SpiType
@@ -127,7 +122,7 @@ data SpiType where
     Qualified :: Qualifier -> Pretype -> SpiType
     TypeVar   :: String -> SpiType
     Recursive :: String -> SpiType -> SpiType
-    deriving (Show, Eq) -- intensional equality defined here
+    deriving (Show, Eq, Ord) -- intensional equality defined here
 
 dualType :: SpiType -> SpiType
 dualType End = End
@@ -156,9 +151,8 @@ subsType x t (Qualified q (Receiving t1 t2)) = Qualified q (Receiving (subsType 
 subsType _ _ t = t
 
 instance Bisimulation SpiType where
-    bisim :: S.Set (String, String) -> SpiType -> SpiType -> Bool
-    bisim _ t1 t2 | t1 == t2 = True
-    bisim rel t1 t2 | S.member (show t1, show t2) rel || S.member (show t2, show t1) rel = True
-    bisim rel t1@(Recursive x t) t2 = bisim (S.insert (show t1, show t2) rel) (subsType x t1 t) t2
-    bisim rel t1 t2@(Recursive x t) = bisim (S.insert (show t1, show t2) rel) t1 (subsType x t2 t)
-    bisim _ _ _ = False
+    behave :: SpiType -> Maybe (SpiType, SpiType)
+    behave (Qualified q (Sending v t)) = Just (t, Qualified q (Sending v End))
+    behave (Qualified q (Receiving v t)) = Just (t, Qualified q (Sending v End))
+    behave t@(Recursive x t') = behave (subsType x t t')
+    behave t = Just (t, t)

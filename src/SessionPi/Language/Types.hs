@@ -6,12 +6,35 @@ import qualified Data.Set as S
 import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, evalList, rdeepseq)
 import Text.Printf (printf)
+import Bisimulation ((~))
 
 -- We want to typecheck processes and claims over both values and variables
 type Claim = (Val, SpiType)
 
 -- Contexts are maps of claims on variables
 type Context = M.Map String SpiType
+
+-- Drops any linear claim in the context
+getUnrestricted :: Context -> Context
+getUnrestricted = M.filter unrestricted
+
+-- Computes all possible distribution of linear variables in the context,
+--  i.e. it computes all possible splits of the "linear subset" of the context
+--  preserving all unrestricted variables
+ndsplit :: Context -> [(Context, Context)]
+ndsplit ctx | M.size ctx == 0 = [(mempty, mempty)]
+ndsplit ctx =
+    let unr = getUnrestricted ctx
+        lin = M.difference ctx unr
+        lins :: [Context]
+        lins =
+            (M.fromArgSet <$>) $
+            S.toList $       -- for all the
+            S.powerSet $     -- possible combination of
+            M.argSet lin     -- (claims with) linearly qualified types
+     in [(unr `M.union` comb, unr `M.union` (lin `M.difference` comb)) | comb <- lins]
+     -- all possible splits that keep unrestricted channels in all contexts
+     -- and distribute linear channels in the two results
 
 type TypeErrorBundle = String
 
@@ -52,11 +75,14 @@ liftPure = liftC . (return .)
 
 instance TypeCheck Claim where
     check :: Claim -> CT ()
+    -- Any literal value types boolean iff the context is unrestricted
     check (Lit _, Boolean) = unGamma
+    -- Any variable types the type t iff an equivalent claim is present in the context (and the other claims are unrestricted)
     check (Var x, t) = do
         found <- get x
         when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
         unGamma
+    -- Any other check yields an error
     check _ = throwError "Tryed to check a literal with a channel type"
 
 
@@ -80,11 +106,6 @@ sideEffect f = CT (do
     c' <- f
     return (return ((), c')))
 
--- Returns a context that ignores the previous context and restarts
---  with a new one.
-overrideWith :: Context -> CT ()
-overrideWith = sideEffect . const
-
 -- Returns the current context as a result.
 ctId :: CT Context
 ctId = liftC return
@@ -92,9 +113,52 @@ ctId = liftC return
 -- The `start` operator describes a computation that starts with a 
 --  context unrelated with the preceding ones.
 (|>) :: Context -> CT () -> CT ()
-c |> ct = overrideWith c >> ct
+c |> ct = sideEffect (const c) >> ct
 
--- The `fork` operator describes a context transition that needs 
+-- Context manipulation following the Data.Map interface
+
+-- Pure evaluation of whether a variable is defined
+member :: String -> CT Bool
+member = liftPure . M.member
+
+-- Get the type of a variable. It yields an error if the variable
+--  is not defined.
+get :: String -> CT SpiType
+get k = do
+    r <- liftPure (M.lookup k)
+    case r of
+        Just t -> return t
+        Nothing-> throwError (printf "Variable %s not defined" k)
+
+-- Overrides a variable claim in the context
+override :: String -> SpiType -> CT ()
+override k = sideEffect . M.insert k
+
+-- Updates a variable claim following the context update rules:
+--  - if the context didn't have a claim on the same variable, behave as insert
+--  - throw an error unless the updating type was unrestricted and bisimilar to the found type
+update :: String -> SpiType -> CT ()
+update k t = do
+    may <- liftPure (M.lookup k)
+    case may of
+        Just found -> unless (unrestricted t && found ~ t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
+        Nothing    -> sideEffect (M.insert k t)
+
+-- Removes a variable claim from the context
+delete :: String -> CT ()
+delete = sideEffect . M.delete
+
+-- Gets a variable claim and removes it unless it was unrestricted
+extract :: String -> CT SpiType
+extract k = do
+    t <- get k
+    t <$ unless (unrestricted t) (delete k)
+
+-- Drops any linear claim in the context
+dropLinear :: CT ()
+dropLinear = sideEffect getUnrestricted
+
+-- The `fork` operator describes a sequent that needs 
 --  more premises. It describes which premises are to be checked.
 (-<) :: CT () -> [CT ()] -> CT [Either TypeErrorBundle ()]
 ct -< cts = do
@@ -105,7 +169,7 @@ ct -< cts = do
 
 -- The `join` operator combines the different premises 
 --  into one single thread of execution, requiring all premises
---  to be truthy.
+--  to be truthy. The premises are evaluated in parallel by default.
 (>-) :: CT [Either TypeErrorBundle ()] -> CT () -> CT ()
 cts >- ct = do
     let evalIndependently = foldl (>>) (Right ()) . (`using` evalList rdeepseq)
@@ -116,9 +180,13 @@ cts >- ct = do
 detach :: [CT ()] -> CT ()
 detach cts = return () -< cts >- return ()
 
+
 instance TypeCheck Proc where
     check :: Proc -> CT ()
+    -- The inaction process is well typed when the context has no linear variables
     check Nil = unGamma
+    -- The parallel process is whell typed when there exist two context splits typing the parallel
+    -- Note that it requires only one split to be successful, as not in the default multiple-premises behaviour.
     check (Par p1 p2) = do
         splits <- liftPure ndsplit
         let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ]
@@ -127,23 +195,40 @@ instance TypeCheck Proc where
             outcome = foldChoice results
             ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
         liftEither (mapLeft ppsplit outcome)
+    -- A bind is well typed iff the subprocess is well typed overriding the definitions of the bounded variables.
     check (Bnd (x, Just tx) (y, Just ty) p) = do
-        update x tx
-        update y ty
+        override x tx
+        override y ty
         check p
-    check (Bnd {}) = throwError "Bind without annotations"
+    check (Bnd {}) = throwError "Bind without type definitions untypable - type inference not implemented."
+    -- A branch is well typed iff:
+    --  - the guard is a boolean
+    --  - both the "then" and "else" processes are well typed under the same context
+    -- Note that this is a semplification justified by the fact that in no way the check of a
+    --  boolean variable or literal "consumes" a linear claim.
+    -- Hence all the linear claims are preserved through any split of the context.
     check (Brn g p1 p2) = detach
         [ dropLinear >> check (g, Boolean)
         , check p1
         , check p2
         ]
+    -- A receiving process is well typed iff the receiving channel is defined and its type is a qualified
+    --  receiving pretype; furthermore it needs to update the channel's type and override the newly bound variable
+    --  before type checking the subprocess.
     check (Rec x y p) = do
         (t, u) <- extract x >>= \case
                 Qualified _ (Receiving t u) -> return (t, u)
                 left -> throwError (printf "Receive channel %s typed against unmatching type: %s is not a qualified receiving pretype" x (show left))
         update x u
-        replace y t
+        override y t
         check p
+    -- A sending process is well typed iff the sending channel's type is a qualified sending pretype,
+    --  and then the context has to:
+    --  - type the value to send
+    --  - type the remaining subprocess
+    -- If the value to send was to typecheck against an unrestricted type, then it is sufficient that
+    --  the unrestricted subcontext types such claim.
+    -- Otherwise, it is sufficient to find (and removing) a matching claim in the context.
     check (Snd x v p) = do
         (t, u) <- extract x >>= \case
                 Qualified _ (Sending t u) -> return (t, u)
@@ -151,81 +236,42 @@ instance TypeCheck Proc where
         case (v, t) of
                 (Var y, Qualified Lin _) -> do
                     t' <- extract y
-                    when (t /= t') $ throwError (printf "Variable %s with type $s in context was typed against an unmatching type %s" x (show t) (show t'))
+                    when (t /= t') $ throwError (printf "Variable %s with type %s in context was typed against an unmatching type %s" x (show t) (show t'))
                 _ -> detach [ dropLinear >> check (v, t) ]
         update x u
         check p
 
+-- To check whether a process is well typed it is sufficient to check it against the empty context.
 typeCheck :: Proc -> Either TypeErrorBundle ()
 typeCheck p = fst <$> unwrap (check p) M.empty
 
+-- Utilities
+
+-- Functor Applicative Monad instances of context transitions
 instance Functor CT where
+    fmap :: (a -> b) -> CT a -> CT b
     fmap f (CT fa) = CT (\c -> do
         (a, c') <- fa c
         return (f a, c'))
 
 instance Applicative CT where
+    pure :: a -> CT a
     pure x = CT (\c -> Right (x, c))
+    (<*>) :: CT (a -> b) -> CT a -> CT b
     CT fn <*> CT fa = CT (\c -> do
         (f, c')  <- fn c
         (a, c'') <- fa c'
         return (f a, c''))
 
 instance Monad CT where
+    (>>=) :: CT a -> (a -> CT b) -> CT b
     CT fa >>= f = CT (\c -> do
         (a, c') <- fa c
         unwrap (f a) c')
 
-getUnrestricted :: Context -> Context
-getUnrestricted = M.filter unrestricted
-
-dropLinear :: CT ()
-dropLinear = sideEffect getUnrestricted
-
-ndsplit :: Context -> [(Context, Context)]
-ndsplit ctx | M.size ctx == 0 = [(mempty, mempty)]
-ndsplit ctx =
-    let unr = getUnrestricted ctx
-        lin = M.difference ctx unr
-        lins :: [Context]
-        lins =
-            (M.fromArgSet <$>) $
-            S.toList $       -- for all the
-            S.powerSet $     -- possible combination of
-            M.argSet lin     -- (claims with) linearly qualified types
-     in [(unr `M.union` comb, unr `M.union` (lin `M.difference` comb)) | comb <- lins]
-     -- all possible splits that keep unrestricted channels in all contexts
-     -- and distribute linear channels in the two results
-
-member :: String -> CT Bool
-member = liftPure . M.member
-
-get :: String -> CT SpiType
-get k = do
-    r <- liftPure (M.lookup k)
-    case r of
-        Just t -> return t
-        Nothing-> throwError (printf "Variable %s not defined" k)
-
-replace :: String -> SpiType -> CT ()
-replace k = sideEffect . M.insert k
-
-update :: String -> SpiType -> CT ()
-update k t = do
-    may <- liftPure (M.lookup k)
-    case may of
-        Just found -> unless (found == t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
-        Nothing    -> sideEffect (M.insert k t)
-
-delete :: String -> CT ()
-delete = sideEffect . M.delete
-
-extract :: String -> CT SpiType
-extract k = do
-    t <- get k
-    t <$ unless (unrestricted t) (delete k)
-
-
+-- Folds all the eithers with Left as identity element,
+--  resulting in an either with the list of all Lefts 
+--  if there was no Right element, returns such Right otherwise.
 foldChoice :: [Either a b] -> Either [a] b
 foldChoice [] = Left []
 foldChoice (e:es) = case e of
@@ -233,7 +279,7 @@ foldChoice (e:es) = case e of
     Left  l -> case foldChoice es of
             Right r -> Right r
             Left ls -> Left (l:ls)
-
+-- Transforms an either's Left element.
 mapLeft :: (a -> a') -> Either a b -> Either a' b
 mapLeft f (Left l) = Left (f l)
 mapLeft _ (Right r) = Right r

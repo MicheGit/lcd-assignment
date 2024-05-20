@@ -18,7 +18,7 @@ getParsedProgram = do
             [filename] -> return filename
             _ -> do
                 print "Missing filename from command line arguments."
-                print "Usage: cabal run ai -- path/to/file.spi"
+                print "Usage: stack run -- path/to/file.spi"
                 throw $ userError "Expected Argument Error"
     filecontent <- readFile filename
     let result = parseProcess filename filecontent

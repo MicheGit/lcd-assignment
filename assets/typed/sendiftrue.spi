@@ -1,4 +1,4 @@
-x >< y: un? bool .end. -- should type with mu
+x >< y: rec x.un? bool .x. -- should type with mu
     { x << true . y >> z . if z then 0 else 0
     | y >> z . if z
         then x << false . 0
