@@ -1,3 +1,4 @@
+-- shouldn't type as x1 is not a boolean but rather a channel
 x1 >< x2: bool . if x1 
     then 0 
     else 0

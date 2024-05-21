@@ -1,1 +1,2 @@
+-- shouldn't type as the y receiving channel is not used
 x >< y: lin? bool.end . x << true.0

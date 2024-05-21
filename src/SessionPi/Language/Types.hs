@@ -6,7 +6,7 @@ import qualified Data.Set as S
 import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, evalList, rdeepseq)
 import Text.Printf (printf)
-import Bisimulation ((~))
+import Bisimulation ((~), Bisimulation (behave))
 
 -- We want to typecheck processes and claims over both values and variables
 type Claim = (Val, SpiType)
@@ -83,7 +83,7 @@ instance TypeCheck Claim where
         when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
         unGamma
     -- Any other check yields an error
-    check _ = throwError "Tryed to check a literal with a channel type"
+    check c = throwError (printf "Tried to check %s, i.e. a literal with a channel type" (show c))
 
 
 -- The liftC function lifts an Either predicate over contexts to a CT
@@ -216,11 +216,12 @@ instance TypeCheck Proc where
     --  receiving pretype; furthermore it needs to update the channel's type and override the newly bound variable
     --  before type checking the subprocess.
     check (Rec x y p) = do
-        (t, u) <- extract x >>= \case
-                Qualified _ (Receiving t u) -> return (t, u)
-                left -> throwError (printf "Receive channel %s typed against unmatching type: %s is not a qualified receiving pretype" x (show left))
+        t <- extract x
+        (v, u) <- case behave t of
+            Just (u, Qualified _ (Receiving v _)) -> return (v, u)
+            b -> throwError (printf "Channel %s : %s does not behave like a receiving channel, but rather as %s" x (show t) (show b))
         update x u
-        override y t
+        override y v
         check p
     -- A sending process is well typed iff the sending channel's type is a qualified sending pretype,
     --  and then the context has to:
@@ -230,14 +231,15 @@ instance TypeCheck Proc where
     --  the unrestricted subcontext types such claim.
     -- Otherwise, it is sufficient to find (and removing) a matching claim in the context.
     check (Snd x v p) = do
-        (t, u) <- extract x >>= \case
-                Qualified _ (Sending t u) -> return (t, u)
-                left -> throwError (printf "Send channel %s typed against unmatching type: %s is not a qualified sending pretype" x (show left))
-        case (v, t) of
+        t <- extract x
+        (a, u) <- case behave t of
+            Just (u, Qualified _ (Sending a _)) -> return (a, u)
+            b -> throwError (printf "Channel %s : %s does not behave like a sending channel, but rather as %s" x (show t) (show b))
+        case (v, a) of
                 (Var y, Qualified Lin _) -> do
-                    t' <- extract y
-                    when (t /= t') $ throwError (printf "Variable %s with type %s in context was typed against an unmatching type %s" x (show t) (show t'))
-                _ -> detach [ dropLinear >> check (v, t) ]
+                    a' <- extract y
+                    when (a /= a') $ throwError (printf "Variable %s with type %s in context was typed against an unmatching type %s" x (show t) (show a'))
+                _ -> detach [ dropLinear >> check (v, a) ]
         update x u
         check p
 

@@ -191,12 +191,12 @@ specTypes = do
         
     describe "Should parse pretypes" $ do
         it "parses a sending bool then end pretype" $ do
-            let result = parse pretype "test" "!bool .end"
+            let result = parse (pretype spiType) "test" "!bool .end"
             let expected = Right (Sending Boolean End)
             result `shouldBe` expected
         
         it "parses an (illtyped) receiving end then bool" $ do
-            let result = parse pretype "test" "?end. (bool)"
+            let result = parse (pretype spiType) "test" "?end. (bool)"
             let expected = Right (Receiving End Boolean)
             result `shouldBe` expected
 
@@ -238,7 +238,7 @@ specTypes = do
             result `shouldBe` expected
         
         it "parses a type always sending a boolean" $ do
-            let result = parse recursiveType "test" "rec x.un! bool.x"
+            let result = parse recursiveType "test" "rec x. !bool.x"
             let expected = Right (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))))
             result `shouldBe` expected
 

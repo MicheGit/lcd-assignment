@@ -1,1 +1,2 @@
+-- this process should be well typed with the empty context
 if true then 0 else 0

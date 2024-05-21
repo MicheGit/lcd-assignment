@@ -124,79 +124,68 @@ literal = choice
     ]
 
 spiType :: Parser SpiType
-spiType = choice
-    [ linearType
-    , unrestrictedType
-    , betweenRound spiType
-    ]
-
-linearType :: Parser SpiType
-linearType = qualLinPretype
-
-unrestrictedType :: Parser SpiType
-unrestrictedType = choice $ try <$>
-    [ boolType
-    , inactionType
-    , qualUnPretype
-    , recursiveType
+spiType = choice $ try <$>
+    [ inactionType
+    , boolType
     , typeVar
+    , qualified
+    , recursiveType
     , betweenRound spiType
     ]
+
+inactionType :: Parser SpiType
+inactionType = End <$ keyword "end"
+
+boolType :: Parser SpiType
+boolType = Boolean <$ keyword "bool"
 
 typeVar :: Parser SpiType
 typeVar = TypeVar <$> variable
+
+qualified :: Parser SpiType
+qualified = do
+    q <- qualifier
+    Qualified q <$> pretype spiType
+
+qualifier :: Parser Qualifier
+qualifier = choice
+    [ Un  <$ keyword "un"
+    , Lin <$ keyword "lin"
+    ]
+
+pretype :: Parser SpiType -> Parser Pretype
+pretype p = do
+    ope <- operation
+    val <- choice
+        [ boolType
+        , inactionType
+        , betweenRound spiType
+        ]
+    symbol "."
+    ope val <$> p
+
+operation :: Parser (SpiType -> SpiType -> Pretype)
+operation = choice
+        [ Sending   <$ symbol "!"
+        , Receiving <$ symbol "?"
+        ]
 
 recursiveType :: Parser SpiType
 recursiveType = do
     keyword "rec"
     x <- variable
     symbol "."
-    Recursive x <$> spiType
+    Recursive x <$> conUnType
 
-boolType :: Parser SpiType
-boolType = Boolean <$ keyword "bool"
-
-inactionType :: Parser SpiType
-inactionType = End <$ keyword "end"
-
-qualUnPretype :: Parser SpiType
-qualUnPretype = do
-    optional $ keyword "un"
-    Qualified Un <$> unrestrictedPretype
-
-unrestrictedPretype :: Parser Pretype
-unrestrictedPretype = do
-    oper <- operation
-    valt <- choice
-        [ boolType
-        , inactionType
-        , betweenRound spiType
-        ]
-    symbol "."
-    oper valt <$> unrestrictedType
-
-qualLinPretype :: Parser SpiType
-qualLinPretype = do
-    keyword "lin"
-    Qualified Lin <$> pretype
-
-pretype :: Parser Pretype
-pretype = do
-    oper <- operation
-    valt <- choice
-        [ boolType
-        , inactionType
-        , betweenRound spiType
-        ]
-    symbol "."
-    oper valt <$> spiType
-
-
-operation :: Parser (SpiType -> SpiType -> Pretype)
-operation = choice
-        [ Sending <$ symbol "!"
-        , Receiving <$ symbol "?"
-        ]
+-- contractive unrestricted
+conUnType :: Parser SpiType
+conUnType = choice $ try <$>
+    [ inactionType
+    , boolType
+    , typeVar
+    , Qualified Un <$> pretype conUnType
+    , betweenRound conUnType
+    ]
 
 claim :: Parser BoundVar
 claim = do

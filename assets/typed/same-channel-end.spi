@@ -1,1 +1,4 @@
+-- shouldn't type as the x1 channel is used both as send and receive
+-- actually with this order, it fails because there is no way a linear channel 
+-- is split in two different processes
 x1 >< x2: lin? bool.end . x1 << true . 0 | x1 >> y . 0

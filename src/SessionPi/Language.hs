@@ -153,6 +153,14 @@ subsType _ _ t = t
 instance Bisimulation SpiType where
     behave :: SpiType -> Maybe (SpiType, SpiType)
     behave (Qualified q (Sending v t)) = Just (t, Qualified q (Sending v End))
-    behave (Qualified q (Receiving v t)) = Just (t, Qualified q (Sending v End))
+    behave (Qualified q (Receiving v t)) = Just (t, Qualified q (Receiving v End))
     behave t@(Recursive x t') = behave (subsType x t t')
     behave t = Just (t, t)
+
+{-
+>>>subsType "x" (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x")))) (Qualified Un (Sending Boolean (TypeVar "x")))
+Qualified Un (Sending Boolean (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x")))))
+>>>behave 
+>>>behave (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))))
+Just (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))),Qualified Un (Sending Boolean End))
+-}
