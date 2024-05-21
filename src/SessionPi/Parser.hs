@@ -5,7 +5,7 @@ import Data.Text (Text, pack)
 
 import Control.Monad (void, join)
 
-import Text.Megaparsec (Parsec, choice, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse, many, optional)
+import Text.Megaparsec (Parsec, choice, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse, many)
 import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
@@ -99,17 +99,41 @@ send :: Parser Proc
 send = do
     chn <- variable
     symbol "<<"
-    val <- value
-    symbol "."
-    Snd chn val <$> parseLeaf
+    do
+        val <- value
+        symbol "."
+        Snd chn val <$> parseLeaf
+        <|> do
+        (v1, v2) <- tuple value
+        symbol "."
+        Bnd ("_y1", undefined) ("_y2", undefined)
+            . Snd chn (Var "_y2")
+            . Snd "_y1" v1
+            . Snd "_y1" v2
+            <$> parseLeaf
 
 receive :: Parser Proc
 receive = do
     chn <- variable
     symbol ">>"
-    var <- variable
-    symbol "."
-    Rec chn var <$> parseLeaf
+    do
+        var <- variable
+        symbol "."
+        Rec chn var <$> parseLeaf
+        <|> do
+            (v1, v2) <- tuple variable
+            symbol "."
+            Rec "_z" chn . Rec v1 "_z" . Rec v2 "_z" <$> parseLeaf
+
+
+tuple :: Parser t -> Parser (t, t)
+tuple p = do
+    symbol "("
+    v1 <- p
+    symbol ","
+    v2 <- p
+    symbol ")"
+    return (v1, v2)
 
 value :: Parser Val
 value = choice $ try <$>
