@@ -1,0 +1,19 @@
+-- Should type with element given in chapter 4
+x >< y: rec x.?bool.x .
+    x1 >< y1: lin?bool.lin!bool.end .
+        x2 >< y2: lin?bool.lin!bool.end .
+            { x << true . y >> z . if z then 0 else 0
+            | y >> z . if z
+                then x << false . 0
+                else 0
+            | x1 << true . x1 >> n . 
+                { x << false . y >> n . 0
+                | y2 >> n . y2 << n .0
+                }
+            | y1 >> n . y1 << false . 
+                { x2 << false . x2 >> n .0
+                | y >> f . if f
+                    then 0
+                    else x << false .0
+                }
+            }

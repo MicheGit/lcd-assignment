@@ -106,7 +106,7 @@ send = do
         <|> do
         (v1, v2) <- tuple value
         symbol "."
-        Bnd ("_y1", undefined) ("_y2", undefined)
+        Bnd ("_y1", Nothing) ("_y2", Nothing)
             . Snd chn (Var "_y2")
             . Snd "_y1" v1
             . Snd "_y1" v2

@@ -200,6 +200,8 @@ instance TypeCheck Proc where
         override x tx
         override y ty
         check p
+    -- TODO type inferrer
+    --  Finite lattice Top > {ChannelType > {{Linear, Unrestricted}, {Sending, Receiving}} > \times, Bool} > Bottom
     check (Bnd {}) = throwError "Bind without type definitions untypable - type inference not implemented."
     -- A branch is well typed iff:
     --  - the guard is a boolean

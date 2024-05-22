@@ -53,6 +53,7 @@ library
   build-depends:
       base >=4.7 && <5
     , containers
+    , lattices
     , megaparsec
     , parallel
     , text
@@ -79,10 +80,11 @@ executable lcd-assignment-exe
       DefaultSignatures
       DeriveAnyClass
       TypeFamilies
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N4
   build-depends:
       base >=4.7 && <5
     , containers
+    , lattices
     , lcd-assignment
     , megaparsec
     , parallel
@@ -118,6 +120,7 @@ test-suite lcd-assignment-test
       base >=4.7 && <5
     , containers
     , hspec
+    , lattices
     , lcd-assignment
     , megaparsec
     , parallel
