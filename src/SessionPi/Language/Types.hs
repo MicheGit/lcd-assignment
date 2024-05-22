@@ -4,7 +4,7 @@ import SessionPi.Language
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Monad (when, unless)
-import Control.Parallel.Strategies (using, evalList, rdeepseq)
+import Control.Parallel.Strategies (using, rdeepseq, parList)
 import Text.Printf (printf)
 import Bisimulation ((~), Bisimulation (behave))
 
@@ -172,7 +172,7 @@ ct -< cts = do
 --  to be truthy. The premises are evaluated in parallel by default.
 (>-) :: CT [Either TypeErrorBundle ()] -> CT () -> CT ()
 cts >- ct = do
-    let evalIndependently = foldl (>>) (Right ()) . (`using` evalList rdeepseq)
+    let evalIndependently = foldl (>>) (Right ()) . (`using` parList rdeepseq)
     res <- evalIndependently <$> cts
     liftEither res >> ct
 
@@ -191,7 +191,7 @@ instance TypeCheck Proc where
         splits <- liftPure ndsplit
         let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ]
         runs <- return () -< (uncurry cand <$> splits)
-        let results = runs `using` evalList rdeepseq
+        let results = runs `using` parList rdeepseq
             outcome = foldChoice results
             ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
         liftEither (mapLeft ppsplit outcome)
