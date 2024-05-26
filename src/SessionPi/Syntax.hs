@@ -115,6 +115,13 @@ data Pretype where
     Sending   :: SpiType -> SpiType -> Pretype
     deriving (Show, Eq, Ord)
 
+argument :: Pretype -> SpiType
+argument (Receiving a _) = a
+argument (Sending a _)   = a
+
+thenProcess :: Pretype -> SpiType
+thenProcess (Receiving _ p) = p
+thenProcess (Sending _ p)   = p
 
 data SpiType where
     Boolean   :: SpiType
@@ -164,3 +171,5 @@ Qualified Un (Sending Boolean (Recursive "x" (Qualified Un (Sending Boolean (Typ
 >>>behave (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))))
 Just (Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x"))),Qualified Un (Sending Boolean End))
 -}
+
+type Claim = (Val, SpiType)

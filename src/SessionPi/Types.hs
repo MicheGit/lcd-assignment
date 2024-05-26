@@ -9,9 +9,6 @@ import Control.Parallel.Strategies (using, rdeepseq, parList)
 import Text.Printf (printf)
 import Bisimulation ((~), Bisimulation (behave))
 
--- We want to typecheck processes and claims over both values and variables
-type Claim = (Val, SpiType)
-
 -- Contexts are maps of claims on variables
 type Context = M.Map String SpiType
 
