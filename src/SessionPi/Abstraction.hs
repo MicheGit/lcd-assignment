@@ -82,14 +82,15 @@ instance BoundedJoinSemiLattice AAct where
 instance Abstraction Pretype where
     type AbstractDomain Pretype = AAct
     sigma :: Pretype -> AbstractDomain Pretype
-    sigma (Sending _ _)   = ASend
-    sigma (Receiving _ _) = ARecv
+    sigma (Sending {})   = ASend
+    sigma (Receiving {}) = ARecv
 
 data AType where
     TopType :: AType
     ABool :: AType
     AProc :: AType
     AEnd :: AType
+    NonLinear :: AType
     Channel :: AQual -> AAct -> AType -> AType -> AType
     BotType :: AType
     deriving (Eq, Show)
@@ -104,7 +105,9 @@ instance Lattice AType where
     ABool \/ _   = TopType
     _ \/ ABool   = TopType
     (Channel q1 a1 v1 p1) \/ (Channel q2 a2 v2 p2) = Channel (q1 \/ q2) (a1 \/ a2) (v1 \/ v2) (p1 \/ p2)
-    _ \/ _       = AProc
+    p \/ (Channel AUn _ _ _) | p == AEnd || p == NonLinear = NonLinear
+    (Channel AUn _ _ _) \/ p | p == AEnd || p == NonLinear = NonLinear
+    _ \/ _ = AProc
 
     (/\) :: AType -> AType -> AType
     a /\ b       | a == b = a
@@ -115,9 +118,13 @@ instance Lattice AType where
     ABool /\ _   = BotType
     _ /\ ABool   = BotType
     (Channel q1 a1 v1 p1) /\ (Channel q2 a2 v2 p2) = Channel (q1 /\ q2) (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
-    AProc /\ p   = p
-    p /\ AProc   = p
-    _ /\ _       = BotType
+    AProc /\ p = p
+    p /\ AProc = p
+    NonLinear /\ (Channel q a v p) = Channel (AUn /\ q) a v p
+    (Channel q a v p) /\ NonLinear = Channel (AUn /\ q) a v p
+    _ /\ _ = BotType
+
+
 
 instance BoundedMeetSemiLattice AType where
     top :: AType
@@ -171,29 +178,49 @@ instance Inferrable BoundVar where
 instance Inferrable Proc where
     infer :: Proc -> AContext
     infer Nil = M.empty -- from empty set we infer nothing
+    -- from send we infer that x must send a value v and then behave as inferred by p
+    infer (Snd x v p) =
+        let i = infer p
+            pthen = fromMaybe
+                NonLinear -- if not found, it could be any non-linear channel
+                (M.lookup x i)
+         in M.insert x
+            (Channel
+                TopQual -- could be any sending channel type, either linear or unrestricted 
+                ASend
+                (sigma v)
+                pthen)
+            i
+    infer (Rec x y p) =
+        let i = infer p
+            pthen = fromMaybe NonLinear (M.lookup x i) -- if unused, could be anything but linear
+            ay    = fromMaybe AProc (M.lookup y i) -- if unused, could be of any type
+         in M.insert x (Channel TopQual ARecv ay pthen) i
+    -- we infer that before this bind, (at least those bindings of) x1 and x2 are not used
+    -- we ignore any information received from p about x1 and x2
+    infer (Bnd (x1, _) (x2, _) p) = M.delete x1 $ M.delete x2 $ infer p
+    -- invariants found in the two branches must hold for both:
+    --  if we ensure that in one branch a channel must be linear (cannot be unrestricte) it must be in the other as well 
     infer (Brn g p1 p2) =
         let iguard = infer (g, Boolean)
             i1     = infer p1
             i2     = infer p2
          in merge [iguard, i1, i2]
-    infer (Snd x v p) =
-        let i = infer p
-            pthen = fromMaybe AEnd (M.lookup x i)
-         in M.insert x (Channel ALin ASend (sigma v) pthen) i
-    infer (Rec x y p) =
-        let i = infer p
-            pthen = fromMaybe AEnd (M.lookup x i)
-            ay    = fromMaybe AEnd (M.lookup y i)
-         in M.insert x (Channel ALin ARecv ay pthen) i
-    infer (Bnd (x1, _) (x2, _) p) = M.delete x1 $ M.delete x2 $ infer p
-    -- we infer that before that this bind, (at least those bindings of) x1 and x2 are not used
+    -- invariants found in the two threads must hold 
     infer (Par p1 p2) =
         let i1 = infer p1
             i2 = infer p2
-         in M.unionWith parMeet i1 i2 -- TODO e se invece fosse solo \/
+         in M.unionWith parMeet i1 i2
 
 parMeet :: AType -> AType -> AType
-parMeet = undefined
+parMeet AEnd c@(Channel {}) = c
+parMeet c@(Channel {}) AEnd = c
+parMeet NonLinear (Channel {}) = c
+parMeet c@(Channel {}) NonLinear = c
+parMeet (Channel ALin a1 v1 p1) (Channel ALin a2 v2 p2) = Channel AUn (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
+
+
+
 
 
 
