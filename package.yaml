@@ -51,6 +51,7 @@ default-extensions:
 - DefaultSignatures
 - DeriveAnyClass
 - TypeFamilies
+- FlexibleContexts
 
 library:
   source-dirs: src

@@ -1,5 +1,6 @@
-module SessionPi.Language.Types where
-import SessionPi.Language
+module SessionPi.Types where
+
+import SessionPi.Syntax
 
 import qualified Data.Map as M
 import qualified Data.Set as S

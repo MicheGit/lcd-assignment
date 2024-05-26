@@ -1,4 +1,4 @@
-module SessionPi.Language where
+module SessionPi.Syntax where
 
 import Bisimulation (Bisimulation (behave))
 

@@ -1,5 +1,7 @@
 module SessionPi.Parser where
 
+import SessionPi.Syntax
+
 import Data.Void (Void)
 import Data.Text (Text, pack)
 
@@ -9,8 +11,6 @@ import Text.Megaparsec (Parsec, choice, MonadParsec (notFollowedBy), try, empty,
 import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
-
-import SessionPi.Language (Proc (Snd, Rec, Par, Brn, Nil, Bnd), Val (Var, Lit), BoundVar, dualType, SpiType (Boolean, End, Qualified, Recursive, TypeVar), Qualifier (Lin, Un), Pretype (Sending, Receiving))
 
 -- Parser :: * -> *
 type Parser = Parsec

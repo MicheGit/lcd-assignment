@@ -1,8 +1,11 @@
 module SessionPi.Runtime where
+
+
+import SessionPi.Syntax
+
 import Control.Exception (throw)
 import Control.Concurrent (MVar, putMVar, takeMVar, newEmptyMVar, myThreadId, forkFinally)
 
-import SessionPi.Language
 import Text.Printf (printf)
 import Data.Map (Map, insert, (!?))
 import Data.Time.Clock (getCurrentTime)
