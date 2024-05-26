@@ -10,42 +10,32 @@ class (BoundedLattice (AbstractDomain c)) => Abstraction c where
     sigma :: c -> AbstractDomain c
 
 data AQual where
-    TopQual :: AQual
-    AUn :: AQual
-    ALin :: AQual
-    BotQual :: AQual
+    AnyQual :: AQual
+    OnlyUnr :: AQual
     deriving (Eq, Show)
 
 instance Lattice AQual where
     (\/) :: AQual -> AQual -> AQual
-    a \/ b       | a == b = a
-    TopQual \/ _ = TopQual
-    BotQual \/ a = a
-    _ \/ TopQual = TopQual
-    a \/ BotQual = a
-    _ \/ _       = TopQual
+    OnlyUnr \/ OnlyUnr = OnlyUnr
+    _ \/ _             = AnyQual
 
     (/\) :: AQual -> AQual -> AQual
-    a /\ b       | a == b = a
-    TopQual /\ a = a
-    BotQual /\ _ = BotQual
-    a /\ TopQual = a
-    _ /\ BotQual = BotQual
-    _ /\ _       = BotQual
+    AnyQual /\ AnyQual = AnyQual
+    _ /\ _             = OnlyUnr
 
 instance BoundedMeetSemiLattice AQual where
     top :: AQual
-    top = TopQual
+    top = AnyQual
 
 instance BoundedJoinSemiLattice AQual where
     bottom :: AQual
-    bottom = BotQual
+    bottom = OnlyUnr
 
 instance Abstraction Qualifier where
     type AbstractDomain Qualifier = AQual
     sigma :: Qualifier -> AbstractDomain Qualifier
-    sigma Un  = AUn
-    sigma Lin = ALin
+    sigma Un  = OnlyUnr
+    sigma Lin = AnyQual
 
 data AAct where
     TopAct :: AAct
@@ -105,8 +95,8 @@ instance Lattice AType where
     ABool \/ _   = TopType
     _ \/ ABool   = TopType
     (Channel q1 a1 v1 p1) \/ (Channel q2 a2 v2 p2) = Channel (q1 \/ q2) (a1 \/ a2) (v1 \/ v2) (p1 \/ p2)
-    p \/ (Channel AUn _ _ _) | p == AEnd || p == NonLinear = NonLinear
-    (Channel AUn _ _ _) \/ p | p == AEnd || p == NonLinear = NonLinear
+    p \/ (Channel OnlyUnr _ _ _) | p == AEnd || p == NonLinear = NonLinear
+    (Channel OnlyUnr _ _ _) \/ p | p == AEnd || p == NonLinear = NonLinear
     _ \/ _ = AProc
 
     (/\) :: AType -> AType -> AType
@@ -120,11 +110,9 @@ instance Lattice AType where
     (Channel q1 a1 v1 p1) /\ (Channel q2 a2 v2 p2) = Channel (q1 /\ q2) (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
     AProc /\ p = p
     p /\ AProc = p
-    NonLinear /\ (Channel q a v p) = Channel (AUn /\ q) a v p
-    (Channel q a v p) /\ NonLinear = Channel (AUn /\ q) a v p
+    NonLinear /\ (Channel _ a v p) = Channel OnlyUnr a v p
+    (Channel _ a v p) /\ NonLinear = Channel OnlyUnr a v p
     _ /\ _ = BotType
-
-
 
 instance BoundedMeetSemiLattice AType where
     top :: AType
@@ -186,7 +174,7 @@ instance Inferrable Proc where
                 (M.lookup x i)
          in M.insert x
             (Channel
-                TopQual -- could be any sending channel type, either linear or unrestricted 
+                AnyQual -- could be any sending channel type, either linear or unrestricted 
                 ASend
                 (sigma v)
                 pthen)
@@ -195,7 +183,7 @@ instance Inferrable Proc where
         let i = infer p
             pthen = fromMaybe NonLinear (M.lookup x i) -- if unused, could be anything but linear
             ay    = fromMaybe AProc (M.lookup y i) -- if unused, could be of any type
-         in M.insert x (Channel TopQual ARecv ay pthen) i
+         in M.insert x (Channel AnyQual ARecv ay pthen) i
     -- we infer that before this bind, (at least those bindings of) x1 and x2 are not used
     -- we ignore any information received from p about x1 and x2
     infer (Bnd (x1, _) (x2, _) p) = M.delete x1 $ M.delete x2 $ infer p
@@ -206,22 +194,19 @@ instance Inferrable Proc where
             i1     = infer p1
             i2     = infer p2
          in merge [iguard, i1, i2]
-    -- invariants found in the two threads must hold 
+    -- invariants found in the two threads mix
     infer (Par p1 p2) =
         let i1 = infer p1
             i2 = infer p2
-         in M.unionWith parMeet i1 i2
+         in M.unionWith parJoin i1 i2
 
-parMeet :: AType -> AType -> AType
-parMeet AEnd c@(Channel {}) = c
-parMeet c@(Channel {}) AEnd = c
-parMeet NonLinear (Channel {}) = c
-parMeet c@(Channel {}) NonLinear = c
-parMeet (Channel ALin a1 v1 p1) (Channel ALin a2 v2 p2) = Channel AUn (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
-
-
-
-
+parJoin :: AType -> AType -> AType
+parJoin (Channel _ a1 v1 p1) (Channel _ a2 v2 p2) = Channel OnlyUnr (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
+parJoin NonLinear (Channel _ a v p) = Channel OnlyUnr a v p
+parJoin (Channel _ a v p) NonLinear = Channel OnlyUnr a v p
+parJoin AEnd c@(Channel {}) = c
+parJoin c@(Channel {}) AEnd = c
+parJoin t1 t2 = t1 /\ t2
 
 
 
