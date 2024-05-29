@@ -29,6 +29,7 @@ library
       Lib
       SessionPi.Abstraction
       SessionPi.Parser
+      SessionPi.Preprocessing
       SessionPi.Runtime
       SessionPi.Syntax
       SessionPi.Types
@@ -99,6 +100,7 @@ test-suite lcd-assignment-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      InferSpec
       LanguageSpec
       ParserSpec
       Paths_lcd_assignment

@@ -123,7 +123,7 @@ receive = do
         <|> do
             (v1, v2) <- tuple variable
             symbol "."
-            Rec "_z" chn . Rec v1 "_z" . Rec v2 "_z" <$> parseLeaf
+            Rec chn "_z" . Rec "_z" v1 . Rec "_z" v2 <$> parseLeaf
 
 
 tuple :: Parser t -> Parser (t, t)

@@ -1,6 +1,6 @@
 module LanguageSpec (spec) where
 import Test.Hspec (Spec, describe, it)
-import SessionPi.Language
+import SessionPi.Syntax
 import Bisimulation
 
 spec :: Spec

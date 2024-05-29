@@ -9,6 +9,9 @@ import Control.Parallel.Strategies (using, rdeepseq, parList)
 import Text.Printf (printf)
 import Bisimulation ((~), Bisimulation (behave))
 
+
+type Claim = (Val, SpiType)
+
 -- Contexts are maps of claims on variables
 type Context = M.Map String SpiType
 

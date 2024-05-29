@@ -3,8 +3,8 @@ module Main (main) where
 import System.Environment (getArgs)
 import Control.Exception (throw)
 
-import SessionPi.Language (Proc, preprocess)
-import SessionPi.Language.Types (typeCheck)
+import SessionPi.Syntax (Proc, preprocess)
+import SessionPi.Types (typeCheck)
 import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
 

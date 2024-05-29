@@ -1,7 +1,10 @@
 module SessionPi.Abstraction where
+
+import SessionPi.Syntax 
+import SessionPi.Types ( Claim )
+
 import Algebra.Lattice (Lattice ((\/), (/\)), BoundedMeetSemiLattice (top), BoundedJoinSemiLattice (bottom), BoundedLattice)
 import qualified Data.Map as M
-import SessionPi.Syntax (Claim, SpiType (..), Qualifier (..), Pretype (..), thenProcess, argument, Proc (..), Val (..), BoundVar)
 import Data.Maybe (fromMaybe)
 
 class (BoundedLattice (AbstractDomain c)) => Abstraction c where
@@ -13,6 +16,10 @@ data AQual where
     AnyQual :: AQual
     OnlyUnr :: AQual
     deriving (Eq, Show)
+
+sampleQualifier :: AQual -> Qualifier
+sampleQualifier AnyQual = Lin
+sampleQualifier OnlyUnr = Un
 
 instance Lattice AQual where
     (\/) :: AQual -> AQual -> AQual
@@ -43,6 +50,13 @@ data AAct where
     ARecv :: AAct
     BotAct :: AAct
     deriving (Eq, Show)
+
+sampleAction :: AAct -> SpiType -> SpiType -> Pretype
+sampleAction TopAct = sampleAction ASend
+sampleAction ASend = Sending
+sampleAction ARecv = Receiving
+sampleAction BotAct = error "Sampled bottom action"
+
 
 instance Lattice AAct where
     (\/) :: AAct -> AAct -> AAct
@@ -85,6 +99,15 @@ data AType where
     BotType :: AType
     deriving (Eq, Show)
 
+sample :: AType -> SpiType
+sample TopType = sample AProc
+sample ABool = Boolean
+sample AProc = sample NonLinear
+sample NonLinear = sample AEnd
+sample AEnd = End
+sample (Channel q a v p) = Qualified (sampleQualifier q) (sampleAction a (sample v) (sample p))
+sample BotType = error "Sample bottom abstract type"
+
 instance Lattice AType where
     (\/) :: AType -> AType -> AType
     a \/ b       | a == b = a
@@ -123,10 +146,9 @@ instance BoundedJoinSemiLattice AType where
     bottom = BotType
 
 instance Abstraction Val where
-    type AbstractDomain Val = AType
-    sigma :: Val -> AType
-    sigma (Lit _) = ABool
-    sigma (Var _) = TopType
+    type AbstractDomain Val = AContext -> AType
+    sigma (Var x) = get x
+    sigma _ = const ABool
 
 instance Abstraction SpiType where
     type AbstractDomain SpiType = AType
@@ -142,63 +164,57 @@ instance Abstraction SpiType where
 
 type AContext = M.Map String AType
 
-instance Lattice AContext where
-    (\/) :: AContext -> AContext -> AContext
-    (\/) = M.unionWith (\/)
-    (/\) :: AContext -> AContext -> AContext
-    (/\) = M.intersectionWith (/\)
+get :: String -> AContext -> AType
+get x = fromMaybe TopType . M.lookup x
 
-merge :: [AContext] -> AContext
-merge = foldl (M.unionWith (/\)) M.empty
+merge :: AContext -> AContext -> AContext
+merge = M.unionWith (/\)
 
 class Inferrable a where
+    deduce :: a -> AContext -> AContext
     infer :: a -> AContext
+    infer x = deduce x M.empty
 
 instance Inferrable Claim where
-    infer :: Claim -> AContext
-    infer (Lit _, _) = M.empty -- from literal claims we infer nothing
-    infer (Var x, t) = M.singleton x (sigma t)
-
-instance Inferrable BoundVar where
-    infer :: BoundVar -> AContext
-    infer (x, m) = M.singleton x (maybe TopType sigma m)
+    deduce :: Claim -> AContext -> AContext
+    deduce (Lit _, _) ctx = ctx
+    deduce (Var x, t) ctx = ctx `merge` M.singleton x (sigma t)
 
 instance Inferrable Proc where
-    infer :: Proc -> AContext
-    infer Nil = M.empty -- from empty set we infer nothing
-    -- from send we infer that x must send a value v and then behave as inferred by p
-    infer (Snd x v p) =
-        let i = infer p
-            pthen = fromMaybe
-                NonLinear -- if not found, it could be any non-linear channel
-                (M.lookup x i)
-         in M.insert x
-            (Channel
-                AnyQual -- could be any sending channel type, either linear or unrestricted 
-                ASend
-                (sigma v)
-                pthen)
-            i
-    infer (Rec x y p) =
-        let i = infer p
-            pthen = fromMaybe NonLinear (M.lookup x i) -- if unused, could be anything but linear
-            ay    = fromMaybe AProc (M.lookup y i) -- if unused, could be of any type
-         in M.insert x (Channel AnyQual ARecv ay pthen) i
-    -- we infer that before this bind, (at least those bindings of) x1 and x2 are not used
-    -- we ignore any information received from p about x1 and x2
-    infer (Bnd (x1, _) (x2, _) p) = M.delete x1 $ M.delete x2 $ infer p
-    -- invariants found in the two branches must hold for both:
-    --  if we ensure that in one branch a channel must be linear (cannot be unrestricte) it must be in the other as well 
-    infer (Brn g p1 p2) =
-        let iguard = infer (g, Boolean)
-            i1     = infer p1
-            i2     = infer p2
-         in merge [iguard, i1, i2]
-    -- invariants found in the two threads mix
-    infer (Par p1 p2) =
-        let i1 = infer p1
-            i2 = infer p2
-         in M.unionWith parJoin i1 i2
+    deduce :: Proc -> AContext -> AContext
+    deduce Nil ctx = ctx
+    deduce (Snd x v p) ctx =
+        let ctx' = deduce p (M.delete x $ inferCommunication x v ctx)
+            atp = fromMaybe NonLinear (M.lookup x ctx')
+            atv = sigma v ctx'
+            atx = Channel AnyQual ASend atv atp
+         in M.insert x atx ctx'
+    deduce (Rec x y p) ctx =
+        let ctx' = deduce p (M.delete x $ inferCommunication x (Var y) ctx)
+            atp = fromMaybe NonLinear (M.lookup x ctx')
+            aty = fromMaybe AProc (M.lookup y ctx')
+            atx = Channel AnyQual ARecv aty atp
+         in M.insert x atx ctx'
+    deduce (Bnd (x1, t1) (x2, t2) p) ctx = 
+        let ctx' = M.delete x1 $ M.delete x2 $ deduce p $ M.insert x1 (maybe TopType sigma t1) $ M.insert x2 (maybe TopType sigma t2) ctx
+         in ctx `merge` ctx' -- we preserve old x1 x2 inferred values
+    deduce (Brn g p1 p2) ctx =
+        let ctxg = deduce (g, Boolean) ctx
+            ctx1 = deduce p1 ctxg
+            ctx2 = deduce p2 ctxg
+         in ctx1 `merge` ctx2
+    deduce (Par p1 p2) ctx =
+        let ctx1 = deduce p1 ctx
+            ctx2 = deduce p2 ctx
+         in M.unionWith parJoin ctx1 ctx2
+
+-- M.singleton c (Channel AnyQual TopAct ABool TopType)
+
+inferCommunication :: String -> Val -> AContext -> AContext
+inferCommunication _ (Lit _) ctx = ctx
+inferCommunication c (Var v) ctx = ctx `merge` M.singleton v (case get c ctx of
+            Channel _ _ at _ -> at
+            _ -> TopType)
 
 parJoin :: AType -> AType -> AType
 parJoin (Channel _ a1 v1 p1) (Channel _ a2 v2 p2) = Channel OnlyUnr (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
@@ -207,6 +223,4 @@ parJoin (Channel _ a v p) NonLinear = Channel OnlyUnr a v p
 parJoin AEnd c@(Channel {}) = c
 parJoin c@(Channel {}) AEnd = c
 parJoin t1 t2 = t1 /\ t2
-
-
 

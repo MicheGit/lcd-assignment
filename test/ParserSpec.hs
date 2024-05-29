@@ -2,17 +2,17 @@ module ParserSpec (spec) where
 import Test.Hspec
 
 import SessionPi.Parser
-import SessionPi.Language
+import SessionPi.Syntax
 
 import Text.Megaparsec (parse, some)
 import Data.Either (isLeft)
-import SessionPi.Parser (typeVar, recursiveType)
 
 spec :: Spec
 spec = do
     specLeaves
     specExpr
     specPrepro
+    specSyntaxSugar
     specTypes
 
 specLeaves :: Spec
@@ -162,7 +162,7 @@ specExpr = do
             let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec "y" "g" (Brn (Var "g") Nil Nil))))
             result `shouldBe` expected
 
-
+specPrepro :: Spec
 specPrepro = do
     describe "Should preprocess correctly" $ do
         it "parses and lifts a channel bind" $ do
@@ -175,6 +175,45 @@ specPrepro = do
                     "x >< y . 0 | z >< w . 0 | {a >< b . 0}| 0"
             let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Bnd ("z", Nothing) ("w", Nothing) (Bnd ("a", Nothing) ("b", Nothing) (Par Nil (Par Nil (Par Nil Nil))))))
             (preprocess <$> result) `shouldBe` expected
+
+specSyntaxSugar :: Spec
+specSyntaxSugar = do
+    describe "Should parse tuples" $ do
+        it "parses a tuple of bools" $ do
+            let result = parse (tuple value) "test" "(true, false)"
+            let expected = Right (Lit True, Lit False)
+            result `shouldBe` expected
+        
+        it "parses a tuple of bool and variable" $ do
+            let result = parse (tuple value) "test" "(true, x)"
+            let expected = Right (Lit True, Var "x")
+            result `shouldBe` expected
+        
+        it "parses a tuple of strings" $ do
+            let result = parse (tuple variable) "test" "(v_true, v_false)"
+            let expected = Right ("v_true", "v_false")
+            result `shouldBe` expected
+        
+        it "doesn't parse a tuple of keywords" $ do
+            let result = parse (tuple variable) "test" "(true, v_false)"
+            result `shouldSatisfy` isLeft
+    
+    describe "Should parse tuple communications" $ do
+        it "parses a tuple send of booleans" $ do
+            let result = parse parseLeaf "test" "x << (true, false) . 0"
+            let expected = Right (Bnd ("_y1", Nothing) ("_y2", Nothing) 
+                    (Snd "x" (Var "_y2") 
+                        (Snd "_y1" (Lit True)
+                            (Snd "_y1" (Lit False) Nil))))
+            result `shouldBe` expected
+
+        it "parses a tuple receiving variables" $ do
+            let result = parse parseLeaf "test" "x >> (y, z) . 0"
+            let expected = Right 
+                    (Rec "x" "_z" 
+                        (Rec "_z" "y"
+                            (Rec "_z" "z" Nil)))
+            result `shouldBe` expected
 
 specTypes :: Spec
 specTypes = do
