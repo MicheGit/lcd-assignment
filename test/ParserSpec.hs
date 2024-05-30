@@ -3,9 +3,11 @@ import Test.Hspec
 
 import SessionPi.Parser
 import SessionPi.Syntax
+import SessionPi.Preprocessing
 
 import Text.Megaparsec (parse, some)
 import Data.Either (isLeft)
+import SessionPi.Preprocessing (liftBindings)
 
 spec :: Spec
 spec = do
@@ -168,12 +170,23 @@ specPrepro = do
         it "parses and lifts a channel bind" $ do
             let result = parse process "test" "x >< y . 0 | 0"
             let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par Nil Nil))
+            (liftBindings <$> result) `shouldBe` expected
+
+        it "parses and preprocesses a channel bind" $ do
+            let result = parse process "test" "x >< y . 0 | 0"
+            let expected = Right (Bnd ("x", Just End) ("y", Just End) (Par Nil Nil))
             (preprocess <$> result) `shouldBe` expected
 
         it "parses and lifts all channel binds" $ do
             let result = parse process "test"
                     "x >< y . 0 | z >< w . 0 | {a >< b . 0}| 0"
             let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Bnd ("z", Nothing) ("w", Nothing) (Bnd ("a", Nothing) ("b", Nothing) (Par Nil (Par Nil (Par Nil Nil))))))
+            (liftBindings <$> result) `shouldBe` expected
+        
+        it "parses and preprocesses all channel binds" $ do
+            let result = parse process "test"
+                    "x >< y . 0 | z >< w . 0 | {a >< b . 0}| 0"
+            let expected = Right (Bnd ("x", Just End) ("y", Just End) (Bnd ("z", Just End) ("w", Just End) (Bnd ("a", Just End) ("b", Just End) (Par Nil (Par Nil (Par Nil Nil))))))
             (preprocess <$> result) `shouldBe` expected
 
 specSyntaxSugar :: Spec

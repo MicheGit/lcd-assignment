@@ -1,7 +1,7 @@
 module SessionPi.Abstraction where
 
 import SessionPi.Syntax 
-import SessionPi.Types ( Claim )
+import SessionPi.Types ( Claim, Context )
 
 import Algebra.Lattice (Lattice ((\/), (/\)), BoundedMeetSemiLattice (top), BoundedJoinSemiLattice (bottom), BoundedLattice)
 import qualified Data.Map as M
@@ -57,6 +57,10 @@ sampleAction ASend = Sending
 sampleAction ARecv = Receiving
 sampleAction BotAct = error "Sampled bottom action"
 
+aDualAction :: AAct -> AAct
+aDualAction ASend = ARecv
+aDualAction ARecv = ASend
+aDualAction a = a
 
 instance Lattice AAct where
     (\/) :: AAct -> AAct -> AAct
@@ -107,6 +111,11 @@ sample NonLinear = sample AEnd
 sample AEnd = End
 sample (Channel q a v p) = Qualified (sampleQualifier q) (sampleAction a (sample v) (sample p))
 sample BotType = error "Sample bottom abstract type"
+
+aDualType :: AType -> AType
+aDualType ABool = error "Abstract dual of Boolean is not defined"
+aDualType (Channel q a v p) = Channel q (aDualAction a) v (aDualType p)
+aDualType t = t
 
 instance Lattice AType where
     (\/) :: AType -> AType -> AType

@@ -1,5 +1,9 @@
 module SessionPi.Preprocessing where
 import SessionPi.Syntax
+import SessionPi.Types (Context)
+import qualified Data.Map as M
+import SessionPi.Abstraction
+import Algebra.Lattice ((/\))
 
 preprocess :: Proc -> Proc
 preprocess = fillTypeHoles . liftBindings
@@ -22,4 +26,25 @@ liftBindings (Rec x y p) = Rec x y (liftBindings p)
 liftBindings (Bnd x y p) = Bnd x y (liftBindings p)
 liftBindings (Brn g p1 p2) = Brn g (liftBindings p1) (liftBindings p2)
 
-fillTypeHoles = undefined
+fillTypeHoles :: Proc -> Proc
+fillTypeHoles = fillTypeHoles' M.empty
+
+fillTypeHoles' :: Context -> Proc -> Proc
+fillTypeHoles' ctx (Bnd (x, Just tx) (y, Just ty) p) =
+    let ctx' = M.insert x tx $ M.insert y ty ctx
+     in Bnd (x, Just tx) (y, Just ty) (fillTypeHoles' ctx' p)
+fillTypeHoles' ctx (Bnd (x, mx) (y, my) p) =
+    let atx = maybe TopType sigma mx
+        aty = maybe TopType sigma my
+        actx = M.insert x atx $ M.insert y aty $ deduce p (fmap sigma ctx)
+        atx' = get x actx
+        aty' = get y actx
+        tx = sample $ atx' /\ aDualType aty'
+        ty = sample $ aty' /\ aDualType atx'
+        ctx' = M.insert x tx $ M.insert y ty ctx
+     in Bnd (x, Just tx) (y, Just ty) (fillTypeHoles' ctx' p)
+fillTypeHoles' _ Nil = Nil
+fillTypeHoles' ctx (Snd x y p) = Snd x y (fillTypeHoles' ctx p)
+fillTypeHoles' ctx (Rec x y p) = Rec x y (fillTypeHoles' ctx p)
+fillTypeHoles' ctx (Par p1 p2) = Par (fillTypeHoles' ctx p1) (fillTypeHoles' ctx p2)
+fillTypeHoles' ctx (Brn g p1 p2) = Brn g (fillTypeHoles' ctx p1) (fillTypeHoles' ctx p2)

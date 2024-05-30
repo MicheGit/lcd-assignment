@@ -3,10 +3,11 @@ module Main (main) where
 import System.Environment (getArgs)
 import Control.Exception (throw)
 
-import SessionPi.Syntax (Proc, preprocess)
+import SessionPi.Syntax (Proc)
 import SessionPi.Types (typeCheck)
 import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
+import SessionPi.Preprocessing (preprocess)
 
 main :: IO ()
 main = getParsedProgram >>= run
