@@ -205,7 +205,12 @@ instance Inferrable Proc where
             atx = Channel AnyQual ARecv aty atp
          in M.insert x atx ctx'
     deduce (Bnd (x1, t1) (x2, t2) p) ctx = 
-        let ctx' = M.delete x1 $ M.delete x2 $ deduce p $ M.insert x1 (maybe TopType sigma t1) $ M.insert x2 (maybe TopType sigma t2) ctx
+        let ctx' = M.delete x1 
+                 $ M.delete x2 
+                 $ deduce p 
+                 $ M.insert x1 (maybe TopType sigma t1) 
+                 $ M.insert x2 (maybe TopType sigma t2) 
+                 ctx
          in ctx `merge` ctx' -- we preserve old x1 x2 inferred values
     deduce (Brn g p1 p2) ctx =
         let ctxg = deduce (g, Boolean) ctx

@@ -33,10 +33,11 @@ fillTypeHoles' :: Context -> Proc -> Proc
 fillTypeHoles' ctx (Bnd (x, Just tx) (y, Just ty) p) =
     let ctx' = M.insert x tx $ M.insert y ty ctx
      in Bnd (x, Just tx) (y, Just ty) (fillTypeHoles' ctx' p)
-fillTypeHoles' ctx (Bnd (x, mx) (y, my) p) =
-    let atx = maybe TopType sigma mx
-        aty = maybe TopType sigma my
-        actx = M.insert x atx $ M.insert y aty $ deduce p (fmap sigma ctx)
+fillTypeHoles' ctx (Bnd (x, _) (y, _) p) =
+    -- here both types are Nothing by construction of the program
+    -- but the compiler doesn't know that
+    let p' = fillTypeHoles' (M.delete x $ M.delete y ctx) p
+        actx = deduce p' (fmap sigma $ M.delete x $ M.delete y ctx)
         atx' = get x actx
         aty' = get y actx
         tx = sample $ atx' /\ aDualType aty'
