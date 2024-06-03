@@ -148,7 +148,7 @@ spec = do
         it "fills the unspecified types" $ do
             let e = parseProcess "infer test" "x1 >< x2 . x2 >> (y, z) . 0 | x1 << (true, false) . 0"
             e `shouldSatisfy` isRight
-            let p = preprocess $ fromRight Nil e
+            let p = fromRight Nil $ preprocess $ fromRight Nil e
                 hiddenSendType = Qualified Lin (Sending Boolean (Qualified Lin (Sending Boolean End)))
                 hiddenRecvType = Qualified Lin (Receiving Boolean (Qualified Lin (Receiving Boolean End)))
             p `shouldBe`

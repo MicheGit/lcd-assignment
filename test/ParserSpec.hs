@@ -175,7 +175,7 @@ specPrepro = do
         it "parses and preprocesses a channel bind" $ do
             let result = parse process "test" "x >< y . 0 | 0"
             let expected = Right (Bnd ("x", Just End) ("y", Just End) (Par Nil Nil))
-            (preprocess <$> result) `shouldBe` expected
+            (preprocess <$> result) `shouldBe` Right expected
 
         it "parses and lifts all channel binds" $ do
             let result = parse process "test"
@@ -187,7 +187,7 @@ specPrepro = do
             let result = parse process "test"
                     "x >< y . 0 | z >< w . 0 | {a >< b . 0}| 0"
             let expected = Right (Bnd ("x", Just End) ("y", Just End) (Bnd ("z", Just End) ("w", Just End) (Bnd ("a", Just End) ("b", Just End) (Par Nil (Par Nil (Par Nil Nil))))))
-            (preprocess <$> result) `shouldBe` expected
+            (preprocess <$> result) `shouldBe` Right expected
 
 specSyntaxSugar :: Spec
 specSyntaxSugar = do

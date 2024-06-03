@@ -100,6 +100,7 @@ test-suite lcd-assignment-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      E2ESpec
       InferSpec
       LanguageSpec
       ParserSpec

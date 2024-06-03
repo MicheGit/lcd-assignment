@@ -51,11 +51,11 @@ data AAct where
     BotAct :: AAct
     deriving (Eq, Show)
 
-sampleAction :: AAct -> SpiType -> SpiType -> Pretype
+sampleAction :: AAct -> Either String (SpiType -> SpiType -> Pretype)
 sampleAction TopAct = sampleAction ASend
-sampleAction ASend = Sending
-sampleAction ARecv = Receiving
-sampleAction BotAct = error "Sampled bottom action"
+sampleAction ASend = return Sending
+sampleAction ARecv = return Receiving
+sampleAction BotAct = Left "Sampled bottom action"
 
 aDualAction :: AAct -> AAct
 aDualAction ASend = ARecv
@@ -103,17 +103,21 @@ data AType where
     BotType :: AType
     deriving (Eq, Show)
 
-sample :: AType -> SpiType
+sample :: AType -> Either String SpiType
 sample TopType = sample AProc
-sample ABool = Boolean
+sample ABool = Right Boolean
 sample AProc = sample NonLinear
 sample NonLinear = sample AEnd
-sample AEnd = End
-sample (Channel q a v p) = Qualified (sampleQualifier q) (sampleAction a (sample v) (sample p))
-sample BotType = error "Sample bottom abstract type"
+sample AEnd = Right End
+sample (Channel q a v p) = do
+    sa <- sampleAction a
+    sv <- sample v
+    sp <- sample p
+    return (Qualified (sampleQualifier q) (sa sv sp))
+sample BotType = Left "Sample bottom abstract type"
 
 aDualType :: AType -> AType
-aDualType ABool = error "Abstract dual of Boolean is not defined"
+aDualType ABool = BotType -- no type is dual of boolean
 aDualType (Channel q a v p) = Channel q (aDualAction a) v (aDualType p)
 aDualType t = t
 

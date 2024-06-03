@@ -25,13 +25,19 @@ getParsedProgram = do
     let result = parseProcess filename filecontent
     case result of
         Right raw -> do
-            let program = preprocess raw
-                check = typeCheck program
-            case check of
-                Right () -> do
-                    print "Typecheck successful!"
-                    return program
-                Left err -> throw $ userError err
+            let processed = preprocess raw
+            case processed of
+                Left err -> do
+                    print "Could not infer type for input program"
+                    throw $ userError err
+                Right program ->
+                    case typeCheck program of
+                        Right () -> do
+                            print "Typecheck successful!"
+                            return program
+                        Left err -> throw $ userError err
         Left err -> do
             print err
             throw $ userError "Syntax Error"
+
+
