@@ -85,13 +85,17 @@ run' (Bnd (x, _) (y, _) p) = do
 channel :: String -> ProcIO ChannelEnd
 channel x = case ?channels !? x of
         Just chan -> return chan
-        Nothing   -> throw $ userError (printf "Channel %s is undefined" x)
+        Nothing   -> case ?variables !? x of
+            Just (Var v) -> channel v
+            _ -> throw $ userError (printf "Channel %s is undefined, neither in variables" x) 
 
 eval :: Val -> ProcIO Val
 eval = \case
         Var x -> case ?variables !? x of
                 Just v  -> return v
-                Nothing -> throw $ userError (printf "Variable %s is undefined" x)
+                Nothing -> case ?channels !? x of
+                    Just _ -> return (Var x)
+                    Nothing -> throw $ userError (printf "Variable %s is undefined both as variable and channel" x)
         val   -> return val
 
 logInfo :: String -> ProcIO ()

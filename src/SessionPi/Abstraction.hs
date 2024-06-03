@@ -1,6 +1,6 @@
 module SessionPi.Abstraction where
 
-import SessionPi.Syntax 
+import SessionPi.Syntax
 import SessionPi.Types ( Claim, Context )
 
 import Algebra.Lattice (Lattice ((\/), (/\)), BoundedMeetSemiLattice (top), BoundedJoinSemiLattice (bottom), BoundedLattice)
@@ -144,6 +144,8 @@ instance Lattice AType where
     p /\ AProc = p
     NonLinear /\ (Channel _ a v p) = Channel OnlyUnr a v p
     (Channel _ a v p) /\ NonLinear = Channel OnlyUnr a v p
+    NonLinear /\ AEnd = AEnd
+    AEnd /\ NonLinear = AEnd
     _ /\ _ = BotType
 
 instance BoundedMeetSemiLattice AType where
@@ -204,14 +206,22 @@ instance Inferrable Proc where
             aty = fromMaybe AProc (M.lookup y ctx')
             atx = Channel AnyQual ARecv aty atp
          in M.insert x atx ctx'
-    deduce (Bnd (x1, t1) (x2, t2) p) ctx = 
-        let ctx' = M.delete x1 
-                 $ M.delete x2 
-                 $ deduce p 
-                 $ M.insert x1 (maybe TopType sigma t1) 
-                 $ M.insert x2 (maybe TopType sigma t2) 
-                 ctx
-         in ctx `merge` ctx' -- we preserve old x1 x2 inferred values
+    deduce (Bnd (x1, t1) (x2, t2) p) ctx =
+        let at1 = maybe TopType sigma t1
+            at2 = maybe TopType sigma t2
+            indctx  = deduce p
+                    $ M.insert x1 at1
+                    $ M.insert x2 at2
+                    ctx
+            at1' = get x1 indctx
+            at2' = get x2 indctx
+            depctx  = M.delete x1
+                    $ M.delete x2
+                    $ deduce p
+                    $ M.insert x1 (at1' /\ aDualType at2')
+                    $ M.insert x2 (at2' /\ aDualType at1')
+                    ctx
+         in depctx
     deduce (Brn g p1 p2) ctx =
         let ctxg = deduce (g, Boolean) ctx
             ctx1 = deduce p1 ctxg

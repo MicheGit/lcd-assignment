@@ -102,7 +102,7 @@ spec = do
             tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
             tx2 `shouldBe` Channel AnyQual ARecv tz NonLinear
         
-        it "parses the some related types" $ do
+        it "parses some related types" $ do
             let p = Bnd ("_y1", Nothing) ("_y2", Nothing) (Par
                         (Rec "x2" "_z"
                             (Rec "_z" "y"
@@ -111,12 +111,34 @@ spec = do
                             (Snd "_y1" (Lit True)
                                 (Snd "_y1" (Lit False) Nil))))
                 ac = infer p
-                tz = get "_z" ac
-            tz `shouldBe` Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)
+                tzs = Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool NonLinear)
+                tzr = Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)
             let tx1 = get "x1" ac
                 tx2 = get "x2" ac
-            tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
-            tx2 `shouldBe` Channel AnyQual ARecv tz NonLinear
+            tx1 `shouldBe` Channel AnyQual ASend tzs NonLinear
+            tx2 `shouldBe` Channel AnyQual ARecv tzr NonLinear
+        
+        it "parses the some tight related types" $ do
+            let p = Par
+                        (Rec "x2" "_z"
+                            (Rec "_z" "y"
+                                (Rec "_z" "z" Nil)))
+                        (Snd "x1" (Var "_y2")
+                            (Snd "_y1" (Lit True)
+                                (Snd "_y1" (Lit False) Nil)))
+                tz = Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)
+                ac = deduce p (M.fromList 
+                    [ ("x1", Channel AnyQual ASend tz AEnd)
+                    , ("x2", Channel AnyQual ASend tz AEnd)])
+                ty1 = get "_y1" ac
+                ty2 = get "_y2" ac
+            ty1 `shouldBe` Channel AnyQual ASend ABool (Channel AnyQual ASend ABool NonLinear)
+            ty2 `shouldBe` Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)
+            ty2 /\ aDualType ty1 `shouldBe` ty2
+            -- let tx1 = get "x1" ac
+            --     tx2 = get "x2" ac
+            -- tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
+            -- tx2 `shouldBe` Channel AnyQual ARecv tz NonLinear
 
 
 
@@ -159,6 +181,10 @@ spec = do
             (y2 /\ aDualType y1) `shouldBe`
                 Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool NonLinear)
 
+        it "computes join between tight types" $ do
+            let t1 = Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool NonLinear)) NonLinear
+                t2 = Channel AnyQual ARecv (Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)) NonLinear
+            t1 /\ aDualType t2 `shouldBe` t1
 
         -- it "computes binding types that are passed in parallel"
         --     let y1 = Channel AnyQual ASend ABool (Channel AnyQual ASend ABool NonLinear)
