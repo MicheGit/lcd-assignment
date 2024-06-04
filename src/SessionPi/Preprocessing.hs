@@ -32,27 +32,34 @@ fillTypeHoles = fillTypeHoles' M.empty
 
 -- TODO fiilTypeHoles ma con contesto astratto invece che concreto, e poi il sample viene fatto dal fondo a risalire invece che scendendo
 -- perché arrivati al fondo, si ha 
-fillTypeHoles' :: Context -> Proc -> Either [String] Proc
+fillTypeHoles' :: AContext -> Proc -> Either [String] Proc
 fillTypeHoles' ctx (Bnd (x, Just tx) (y, Just ty) p) = do
-    let ctx' = M.insert x tx $ M.insert y ty ctx
+    let ctx' = M.insert x (sigma tx) $ M.insert y (sigma ty) ctx
     Bnd (x, Just tx) (y, Just ty) <$> fillTypeHoles' ctx' p
 
 fillTypeHoles' ctx pr@(Bnd (x, _) (y, _) p) = do
     -- here both types are Nothing by construction of the program
     -- but the compiler doesn't know that
-    let actx = deduce p (fmap sigma
-                        $ M.delete x
-                        $ M.delete y
-                        ctx)
-        atx' = get x actx
-        aty' = get y actx
+    let shadow = M.delete x . M.delete y
+        actx = deduce p (shadow ctx)
+        atx = get x actx
+        aty = get y actx
+        actx' = M.insert x (atx /\ aDualType aty) $ M.insert y (aty /\ aDualType atx) actx
+    p' <- fillTypeHoles' actx' p `addCallStack` ("Error filling process " ++ show p ++ " within context " ++ show actx')
+    let actx'' = deduce p' (shadow actx')
+        atx' = get x actx''
+        aty' = get y actx''
     tx <- sample (atx' /\ aDualType aty') `addCallStack` ("Error computing dual type for variable " ++ x ++ " in context " ++ show pr)
     ty <- sample (aty' /\ aDualType atx') `addCallStack` ("Error computing dual type for variable " ++ y ++ " in context " ++ show pr)
-    let ctx' = M.insert x tx $ M.insert y ty ctx
-    Bnd (x, Just tx) (y, Just ty) <$> fillTypeHoles' ctx' p
+    return (Bnd (x, Just tx) (y, Just ty) p')
 fillTypeHoles' _ Nil = return Nil
 fillTypeHoles' ctx (Snd x y p) = Snd x y <$> fillTypeHoles' ctx p
-fillTypeHoles' ctx (Rec x y p) = Rec x y <$> fillTypeHoles' ctx p
+fillTypeHoles' ctx (Rec x y p) = do
+    let ty = case get x ctx of
+            Channel _ _ t _ -> t
+            _ -> TopType
+        ctx' = M.insert y ty ctx
+    Rec x y <$> fillTypeHoles' ctx' p
 
 fillTypeHoles' ctx (Par p1 p2) = do
     p1' <- fillTypeHoles' ctx p1

@@ -180,8 +180,9 @@ instance Abstraction SpiType where
         where
             v = argument pretype
             p = thenProcess pretype
-    sigma (TypeVar _) = TopType -- TODO
-    sigma (Recursive _ _) = TopType -- TODO
+    sigma (TypeVar _) = TopType
+    sigma (Recursive _ t) = sigma t
+
 
 type AContext = M.Map String AType
 
@@ -215,7 +216,7 @@ instance Inferrable Proc where
             atp = fromMaybe NonLinear (M.lookup x ctx')
             aty = fromMaybe AProc (M.lookup y ctx')
             atx = Channel AnyQual ARecv aty atp
-         in M.insert x atx ctx'
+         in M.insert x atx $ M.delete y ctx'
     deduce (Bnd (x1, t1) (x2, t2) p) ctx =
         let at1 = maybe TopType sigma t1
             at2 = maybe TopType sigma t2
