@@ -4,8 +4,9 @@ import SessionPi.Types (Context)
 import qualified Data.Map as M
 import SessionPi.Abstraction
 import Algebra.Lattice ((/\))
+import Callstack (addCallStack)
 
-preprocess :: Proc -> Either String Proc
+preprocess :: Proc -> Either [String] Proc
 preprocess = fillTypeHoles . liftBindings
 
 -- bind is active in all parallel branches by definition, equivalently here we lift it to the parent node
@@ -26,15 +27,17 @@ liftBindings (Rec x y p) = Rec x y (liftBindings p)
 liftBindings (Bnd x y p) = Bnd x y (liftBindings p)
 liftBindings (Brn g p1 p2) = Brn g (liftBindings p1) (liftBindings p2)
 
-fillTypeHoles :: Proc -> Either String Proc
+fillTypeHoles :: Proc -> Either [String] Proc
 fillTypeHoles = fillTypeHoles' M.empty
 
-fillTypeHoles' :: Context -> Proc -> Either String Proc
+-- TODO fiilTypeHoles ma con contesto astratto invece che concreto, e poi il sample viene fatto dal fondo a risalire invece che scendendo
+-- perché arrivati al fondo, si ha 
+fillTypeHoles' :: Context -> Proc -> Either [String] Proc
 fillTypeHoles' ctx (Bnd (x, Just tx) (y, Just ty) p) = do
     let ctx' = M.insert x tx $ M.insert y ty ctx
     Bnd (x, Just tx) (y, Just ty) <$> fillTypeHoles' ctx' p
 
-fillTypeHoles' ctx (Bnd (x, _) (y, _) p) = do
+fillTypeHoles' ctx pr@(Bnd (x, _) (y, _) p) = do
     -- here both types are Nothing by construction of the program
     -- but the compiler doesn't know that
     let actx = deduce p (fmap sigma
@@ -43,8 +46,8 @@ fillTypeHoles' ctx (Bnd (x, _) (y, _) p) = do
                         ctx)
         atx' = get x actx
         aty' = get y actx
-    tx <- sample $ atx' /\ aDualType aty'
-    ty <- sample $ aty' /\ aDualType atx'
+    tx <- sample (atx' /\ aDualType aty') `addCallStack` ("Error computing dual type for variable " ++ x ++ " in context " ++ show pr)
+    ty <- sample (aty' /\ aDualType atx') `addCallStack` ("Error computing dual type for variable " ++ y ++ " in context " ++ show pr)
     let ctx' = M.insert x tx $ M.insert y ty ctx
     Bnd (x, Just tx) (y, Just ty) <$> fillTypeHoles' ctx' p
 fillTypeHoles' _ Nil = return Nil

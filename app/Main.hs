@@ -2,6 +2,7 @@ module Main (main) where
 
 import System.Environment (getArgs)
 import Control.Exception (throw)
+import Data.List (intercalate)
 
 import SessionPi.Syntax (Proc)
 import SessionPi.Types (typeCheck)
@@ -29,7 +30,7 @@ getParsedProgram = do
             case processed of
                 Left err -> do
                     print "Could not infer type for input program"
-                    throw $ userError err
+                    throw $ userError (intercalate "\n\t-" err)
                 Right program ->
                     case typeCheck program of
                         Right () -> do

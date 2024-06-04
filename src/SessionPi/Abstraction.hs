@@ -51,11 +51,11 @@ data AAct where
     BotAct :: AAct
     deriving (Eq, Show)
 
-sampleAction :: AAct -> Either String (SpiType -> SpiType -> Pretype)
+sampleAction :: AAct -> Either [String] (SpiType -> SpiType -> Pretype)
 sampleAction TopAct = sampleAction ASend
 sampleAction ASend = return Sending
 sampleAction ARecv = return Receiving
-sampleAction BotAct = Left "Sampled bottom action"
+sampleAction BotAct = Left ["Sampled bottom action"]
 
 aDualAction :: AAct -> AAct
 aDualAction ASend = ARecv
@@ -103,18 +103,24 @@ data AType where
     BotType :: AType
     deriving (Eq, Show)
 
-sample :: AType -> Either String SpiType
+sample :: AType -> Either [String] SpiType
 sample TopType = sample AProc
 sample ABool = Right Boolean
 sample AProc = sample NonLinear
 sample NonLinear = sample AEnd
 sample AEnd = Right End
-sample (Channel q a v p) = do
+sample t@(Channel OnlyUnr a v p) | t /\ p /= BotType = do
+    sa <- sampleAction a
+    sv <- sample v
+    return (Recursive "x" (Qualified Un (sa sv (TypeVar "x"))))
+sample (Channel AnyQual a v p) = do
     sa <- sampleAction a
     sv <- sample v
     sp <- sample p
-    return (Qualified (sampleQualifier q) (sa sv sp))
-sample BotType = Left "Sample bottom abstract type"
+    return (Qualified Lin (sa sv sp)) -- if it could be linear, then better to put linear
+sample BotType = Left ["Sample bottom abstract type"]
+sample t = Left ["Could not infer an useful type from " ++ show t ++ ". Please consider adding type annotations"]
+
 
 aDualType :: AType -> AType
 aDualType ABool = BotType -- no type is dual of boolean
@@ -236,8 +242,6 @@ instance Inferrable Proc where
             ctx2 = deduce p2 ctx
          in M.unionWith parJoin ctx1 ctx2
 
--- M.singleton c (Channel AnyQual TopAct ABool TopType)
-
 inferCommunication :: String -> Val -> AContext -> AContext
 inferCommunication _ (Lit _) ctx = ctx
 inferCommunication c (Var v) ctx = ctx `merge` M.singleton v (case get c ctx of
@@ -246,9 +250,7 @@ inferCommunication c (Var v) ctx = ctx `merge` M.singleton v (case get c ctx of
 
 parJoin :: AType -> AType -> AType
 parJoin (Channel _ a1 v1 p1) (Channel _ a2 v2 p2) = Channel OnlyUnr (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)
-parJoin NonLinear (Channel _ a v p) = Channel OnlyUnr a v p
-parJoin (Channel _ a v p) NonLinear = Channel OnlyUnr a v p
-parJoin AEnd c@(Channel {}) = c
-parJoin c@(Channel {}) AEnd = c
+-- parJoin AEnd c@(Channel {}) = c
+-- parJoin c@(Channel {}) AEnd = c
 parJoin t1 t2 = t1 /\ t2
 

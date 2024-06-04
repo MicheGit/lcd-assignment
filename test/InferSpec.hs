@@ -7,9 +7,11 @@ import SessionPi.Abstraction
 import Data.Either (isRight, fromRight)
 import qualified Data.Map as M
 import Algebra.Lattice (Lattice((/\)))
+import Callstack (fromRight')
 
 spec :: Spec
 spec = do
+
     describe "Should infer some basic types" $ do
         it "should infer a bool channel" $ do
             let e = parseProcess "infer test" "x >< y : lin?bool.end . x << z .0"
@@ -101,7 +103,7 @@ spec = do
                 tx2 = get "x2" ac
             tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
             tx2 `shouldBe` Channel AnyQual ARecv tz NonLinear
-        
+
         it "parses some related types" $ do
             let p = Bnd ("_y1", Nothing) ("_y2", Nothing) (Par
                         (Rec "x2" "_z"
@@ -117,7 +119,7 @@ spec = do
                 tx2 = get "x2" ac
             tx1 `shouldBe` Channel AnyQual ASend tzs NonLinear
             tx2 `shouldBe` Channel AnyQual ARecv tzr NonLinear
-        
+
         it "parses the some tight related types" $ do
             let p = Par
                         (Rec "x2" "_z"
@@ -127,7 +129,7 @@ spec = do
                             (Snd "_y1" (Lit True)
                                 (Snd "_y1" (Lit False) Nil)))
                 tz = Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)
-                ac = deduce p (M.fromList 
+                ac = deduce p (M.fromList
                     [ ("x1", Channel AnyQual ASend tz AEnd)
                     , ("x2", Channel AnyQual ASend tz AEnd)])
                 ty1 = get "_y1" ac
@@ -139,7 +141,6 @@ spec = do
             --     tx2 = get "x2" ac
             -- tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
             -- tx2 `shouldBe` Channel AnyQual ARecv tz NonLinear
-
 
 
 
@@ -165,6 +166,41 @@ spec = do
                             (Snd "x1" (Var "_y2")
                                 (Snd "_y1" (Lit True)
                                     (Snd "_y1" (Lit False) Nil)))))
+
+        it "infers correctly all channels types" $ do
+            let pro = fromRight' $ fillTypeHoles' (M.singleton "v" Boolean) (Bnd ("p1", Nothing) ("p2", Nothing) (Snd "p1" (Var "v") Nil))
+                tp2 = case pro of
+                    (Bnd _ ("p2", Just t) _) -> t
+                    _ -> End
+            tp2 `shouldBe` Qualified Lin (Receiving Boolean End)
+
+        it "infer correctly complex channels types" $ do
+            let p = Bnd ("p2",Nothing) ("p1",Nothing)
+                        (Bnd ("_y1",Nothing) ("_y2",Nothing)
+                            (Bnd ("x1", Nothing) ("x2", Nothing)
+                                (Bnd ("c", Nothing) ("d", Nothing)
+                                    (Par
+                                    (Rec "p1" "_z"
+                                        (Rec "_z" "j"
+                                            (Rec "_z" "w"
+                                                (Snd "j" (Lit True)
+                                                    (Snd "j" (Lit True)
+                                                        (Snd "w" (Var "j") Nil)
+                                                            )))))
+                                    (Snd "p2" (Var "_y2")
+                                        (Snd "_y1" (Var "c")
+                                            (Snd "_y1" (Var "x1")
+                                                (Rec "d" "b1"
+                                                    (Rec "d" "b2"
+                                                        (Rec "x2" "z"
+                                                            (Rec "z" "y" Nil)
+                                                                ))))))
+                                    ))))
+                pro = fromRight' $ preprocess p
+                (tp2, tp1) = case pro of
+                    (Bnd ("p2", Just t2) ("p1", Just t1) _) -> (t2, t1)
+                    _ -> (End, Boolean)
+            tp1 `shouldBe` dualType tp2
 
     describe "Should compute correctly join of dual types" $ do
         it "computes binding types" $ do

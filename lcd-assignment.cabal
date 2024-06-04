@@ -26,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Bisimulation
+      Callstack
       Lib
       SessionPi.Abstraction
       SessionPi.Parser

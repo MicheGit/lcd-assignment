@@ -95,7 +95,12 @@ data Qualifier where
 data Pretype where
     Receiving :: SpiType -> SpiType -> Pretype
     Sending   :: SpiType -> SpiType -> Pretype
-    deriving (Show, Eq, Ord)
+    deriving (Eq, Ord)
+
+instance Show Pretype where
+    show :: Pretype -> String
+    show (Receiving t1 t2) = "?" ++ show t1 ++ " ." ++ show t2
+    show (Sending t1 t2) = "!" ++ show t1 ++ " ." ++ show t2
 
 argument :: Pretype -> SpiType
 argument (Receiving a _) = a
@@ -111,7 +116,16 @@ data SpiType where
     Qualified :: Qualifier -> Pretype -> SpiType
     TypeVar   :: String -> SpiType
     Recursive :: String -> SpiType -> SpiType
-    deriving (Show, Eq, Ord) -- intensional equality defined here
+    deriving (Eq, Ord) -- intensional equality defined here
+
+instance Show SpiType where
+    show :: SpiType -> String
+    show Boolean = "bool"
+    show End = "end"
+    show (Qualified q p) = show q ++ " " ++ show p
+    show (TypeVar t) = t
+    show (Recursive v p) = "rec " ++ v ++ " " ++ show p
+
 
 dualType :: SpiType -> SpiType
 dualType End = End
