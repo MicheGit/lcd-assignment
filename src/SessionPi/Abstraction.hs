@@ -212,7 +212,9 @@ instance Inferrable Proc where
             atx = Channel AnyQual ASend atv atp
          in M.insert x atx ctx'
     deduce (Rec x y p) ctx =
-        let ctx' = deduce p (M.delete x $ inferCommunication x (Var y) ctx)
+        let ctx' = deduce p (M.delete x 
+                            $ inferCommunication x (Var y) 
+                            $ M.delete y ctx)
             atp = fromMaybe NonLinear (M.lookup x ctx')
             aty = fromMaybe AProc (M.lookup y ctx')
             atx = Channel AnyQual ARecv aty atp
@@ -232,15 +234,18 @@ instance Inferrable Proc where
         let ctxWithUnr = M.unionWith parJoin (infer p1) (infer p2)
             -- questo serve solo per applicare OnlyUnr ai processi che appaiono sia a destra che a sinistra
             -- funziona sotto l'assunzione che infer p `less precise than` deduce p ctx
-            ctx1 = deduce p1 ctx 
+            ctx1 = deduce p1 ctx
             ctx2 = deduce p2 ctx
          in ctx `merge` ctx1 `merge` ctx2 `merge` ctxWithUnr
 
 inferCommunication :: String -> Val -> AContext -> AContext
 inferCommunication _ (Lit _) ctx = ctx
-inferCommunication c (Var v) ctx = ctx `merge` M.singleton v (case get c ctx of
+inferCommunication c (Var v) ctx = ctx `merge`
+    M.fromList [(v, tv)]
+    where
+        tv = case get c ctx of
             Channel _ _ at _ -> at
-            _ -> TopType)
+            _ -> TopType
 
 parJoin :: AType -> AType -> AType
 parJoin (Channel _ a1 v1 p1) (Channel _ a2 v2 p2) = Channel OnlyUnr (a1 /\ a2) (v1 /\ v2) (p1 /\ p2)

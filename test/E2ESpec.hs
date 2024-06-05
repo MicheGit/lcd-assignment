@@ -86,9 +86,11 @@ spec = do
                     (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x")))))
             check `shouldSatisfy` isRight
 
-        -- it "accepts tuple passing processes" $ do
-        --     let check = loadInfer "p2 >< p1 . x1 >< x2: lin? (rec x . ?bool.x).end . c >< d: lin? bool.lin? bool. (rec x . !bool.x). {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
-        --     check `shouldSatisfy` isRight
+        it "accepts tuple passing processes with type hint" $ do
+            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (lin? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
+                pro = fromRight' $ preprocess parsed
+            let check = typeCheck pro
+            check `shouldSatisfy` isRight
 
         it "accepts tuple passing processes" $ do
             -- let expected = Bnd ("p2",Nothing) ("p1",Nothing) 
@@ -114,7 +116,7 @@ spec = do
             --                         ))))
             let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
                 pro = fromRight' $ preprocess parsed
-            -- pro `shouldBe` expected
+            -- pro `shouldBe` Nil
             let check = typeCheck pro
             check `shouldSatisfy` isRight
 

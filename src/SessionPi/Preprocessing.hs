@@ -40,7 +40,7 @@ fillTypeHoles' ctx pr@(Bnd (x, _) (y, _) p) = do
     -- here both types are Nothing by construction of the program
     -- but the compiler doesn't know that
     let shadow = M.delete x . M.delete y
-        actx = dualNarrow x y $ lfpFrom (shadow ctx) (dualNarrow x y . deduce p)
+        actx = lfpFrom (shadow ctx) (dualNarrow x y . deduce p)
     p' <- fillTypeHoles' actx p
     let actx' = deduce p' actx
         atx' = get x actx'
