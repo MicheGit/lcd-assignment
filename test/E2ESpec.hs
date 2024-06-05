@@ -119,5 +119,8 @@ spec = do
             -- pro `shouldBe` Nil
             let check = typeCheck pro
             check `shouldSatisfy` isRight
-
+    
+        it "accepts send in nested thread" $ do
+            let check = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"
+            check `shouldSatisfy` isRight
 
