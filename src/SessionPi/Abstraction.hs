@@ -220,28 +220,21 @@ instance Inferrable Proc where
     deduce (Bnd (x1, t1) (x2, t2) p) ctx =
         let at1 = maybe TopType sigma t1
             at2 = maybe TopType sigma t2
-            indctx  = deduce p
-                    $ M.insert x1 at1
-                    $ M.insert x2 at2
-                    ctx
-            at1' = get x1 indctx
-            at2' = get x2 indctx
-            depctx  = M.delete x1
-                    $ M.delete x2
-                    $ deduce p
-                    $ M.insert x1 (at1' /\ aDualType at2')
-                    $ M.insert x2 (at2' /\ aDualType at1')
-                    ctx
-         in depctx
+            shadow = M.insert x1 at1 . M.insert x2 at2
+            ctx' = lfpFrom (shadow ctx) (dualNarrow x1 x2 . deduce p)
+         in M.delete x1 $ M.delete x2 ctx'
     deduce (Brn g p1 p2) ctx =
         let ctxg = deduce (g, Boolean) ctx
             ctx1 = deduce p1 ctxg
             ctx2 = deduce p2 ctxg
          in ctx1 `merge` ctx2
     deduce (Par p1 p2) ctx =
-        let ctx1 = deduce p1 ctx
+        let ctxWithUnr = M.unionWith parJoin (infer p1) (infer p2)
+            -- questo serve solo per applicare OnlyUnr ai processi che appaiono sia a destra che a sinistra
+            -- funziona sotto l'assunzione che infer p `less precise than` deduce p ctx
+            ctx1 = deduce p1 ctx 
             ctx2 = deduce p2 ctx
-         in M.unionWith parJoin ctx1 ctx2
+         in ctx `merge` ctx1 `merge` ctx2 `merge` ctxWithUnr
 
 inferCommunication :: String -> Val -> AContext -> AContext
 inferCommunication _ (Lit _) ctx = ctx
@@ -254,4 +247,14 @@ parJoin (Channel _ a1 v1 p1) (Channel _ a2 v2 p2) = Channel OnlyUnr (a1 /\ a2) (
 -- parJoin AEnd c@(Channel {}) = c
 -- parJoin c@(Channel {}) AEnd = c
 parJoin t1 t2 = t1 /\ t2
+
+dualNarrow :: String -> String -> AContext -> AContext
+dualNarrow x y = do
+    tx <- get x
+    ty <- get y
+    M.insert x (tx /\ aDualType ty) . M.insert y (ty /\ aDualType tx)
+
+lfpFrom :: (Eq a) => a -> (a -> a) -> a
+lfpFrom x fn | fn x == x = x
+             | otherwise = lfpFrom (fn x) fn
 

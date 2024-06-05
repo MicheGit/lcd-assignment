@@ -99,8 +99,8 @@ data Pretype where
 
 instance Show Pretype where
     show :: Pretype -> String
-    show (Receiving t1 t2) = "?" ++ show t1 ++ " ." ++ show t2
-    show (Sending t1 t2) = "!" ++ show t1 ++ " ." ++ show t2
+    show (Receiving t1 t2) = "?(" ++ show t1 ++ ") ." ++ show t2
+    show (Sending t1 t2) = "!(" ++ show t1 ++ ") ." ++ show t2
 
 argument :: Pretype -> SpiType
 argument (Receiving a _) = a

@@ -8,6 +8,7 @@ import Data.Either (isRight, fromRight, Either (Right))
 import qualified Data.Map as M
 import Algebra.Lattice (Lattice((/\)))
 import Callstack (fromRight')
+import SessionPi.Types (typeCheck)
 
 spec :: Spec
 spec = do
@@ -96,8 +97,8 @@ spec = do
             let tx1 = get "x1" ac
                 tx2 = get "x2" ac
             tx1 `shouldBe` Channel AnyQual ASend TopType NonLinear
-            tx2 `shouldBe` Channel AnyQual ARecv 
-                (Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)) 
+            tx2 `shouldBe` Channel AnyQual ARecv
+                (Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear))
                     NonLinear
 
         it "parses some related types" $ do
@@ -145,7 +146,7 @@ spec = do
         it "fills the unspecified types" $ do
             let e = parseProcess "infer test" "x1 >< x2 . x2 >> (y, z) . 0 | x1 << (true, false) . 0"
             e `shouldSatisfy` isRight
-            let p = fromRight Nil $ preprocess $ fromRight Nil e
+            let p = fromRight' $ preprocess $ fromRight Nil e
                 hiddenSendType = Qualified Lin (Sending Boolean (Qualified Lin (Sending Boolean End)))
                 hiddenRecvType = Qualified Lin (Receiving Boolean (Qualified Lin (Receiving Boolean End)))
             p `shouldBe`
@@ -163,60 +164,44 @@ spec = do
                                 (Snd "_y1" (Lit True)
                                     (Snd "_y1" (Lit False) Nil)))))
 
-        it "preserves precision of inferred types" $ do
-            let e = parseProcess "infer test" " x2 >> (y, z) . 0 | x1 << (true, false) . 0"
-            e `shouldSatisfy` isRight
-            let p = liftBindings $ fromRight' e
-            let actx = infer p
-                atx = get "x1" actx
-                aty = get "x2" actx
-                actx' = M.insert "x1" (atx /\ aDualType aty) $ M.insert "x2" (aty /\ aDualType atx) actx
-                e' = fillTypeHoles' actx' p
-            e' `shouldSatisfy` isRight
-            let p' = fromRight' e'
-                shadowed = M.delete "x1" $ M.delete "x2" actx'
-            -- p' `shouldBe` p
-            shadowed `shouldBe` M.empty
-            -- p' `shouldBe` p
-            let actx'' = deduce p' shadowed
-                atx' = get "x1" actx''
-                aty' = get "x2" actx''
-            (atx' /\ aDualType aty') `shouldBe` Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
-            (aty' /\ aDualType atx') `shouldBe` Channel AnyQual ARecv (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
-
-        it "infer correct types" $ do
-            let e = parseProcess "infer test" " x1 >< x2. x2 >> (y, z) . 0 | x1 << (true, false) . 0"
-            e `shouldSatisfy` isRight
-            let p = liftBindings $ fromRight' e
-            let actx = infer p
-            actx `shouldBe` M.empty
-            let e' = fillTypeHoles' actx p
-            e' `shouldSatisfy` isRight
-            let p' = fromRight' e'
-            p' `shouldBe` p
-            -- let actx'' = deduce p' shadowed
-            --     atx' = get "x1" actx''
-            --     aty' = get "x2" actx''
-            -- (atx' /\ aDualType aty') `shouldBe` Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
-            -- (aty' /\ aDualType atx') `shouldBe` Channel AnyQual ARecv (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
+        -- it "preserves precision of inferred types" $ do
+        --     let e = parseProcess "infer test" " x2 >> (y, z) . 0 | x1 << (true, false) . 0"
+        --     e `shouldSatisfy` isRight
+        --     let p = liftBindings $ fromRight' e
+        --     let actx = infer p
+        --         atx = get "x1" actx
+        --         aty = get "x2" actx
+        --         actx' = M.insert "x1" (atx /\ aDualType aty) $ M.insert "x2" (aty /\ aDualType atx) actx
+        --         e' = fillTypeHoles' actx' p
+        --     e' `shouldSatisfy` isRight
+        --     let p' = fromRight' e'
+        --         shadowed = M.delete "x1" $ M.delete "x2" actx'
+        --     -- p' `shouldBe` p
+        --     shadowed `shouldBe` M.empty
+        --     -- p' `shouldBe` p
+        --     let actx'' = deduce p' shadowed
+        --         atx' = get "x1" actx''
+        --         aty' = get "x2" actx''
+        --     (atx' /\ aDualType aty') `shouldBe` Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
+        --     (aty' /\ aDualType atx') `shouldBe` Channel AnyQual ARecv (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
 
         it "doesn't narrow precision of subsequent receives" $ do
             let e = parseProcess "infer test" " x2 >> (y, z) . 0"
             e `shouldSatisfy` isRight
             let p = fromRight' e
-            let actx = infer $ liftBindings p
+            let actx = lfpFrom M.empty (dualNarrow "x1" "x2" . deduce p)
                 tx2 = get "x2" actx
             tx2 `shouldBe` Channel AnyQual ARecv (Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)) NonLinear
-        
+
         it "doesn't narrow precision of subsequent receives even with parallelzation" $ do
             let e = parseProcess "infer test" " x2 >> (y, z) . 0 | x1 << (true, false) . 0"
             e `shouldSatisfy` isRight
             let p = fromRight' e
-            let actx = infer $ liftBindings p
+            let actx = lfpFrom M.empty (dualNarrow "x1" "x2" . deduce p)
                 tx2 = get "x2" actx
                 tx1 = get "x1" actx
             (tx2 /\ aDualType tx1) `shouldBe` Channel AnyQual ARecv (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool NonLinear)) NonLinear
-        
+
         it "infers correctly all channels types" $ do
             let pro = fromRight' $ fillTypeHoles' (M.singleton "v" ABool) (Bnd ("p1", Nothing) ("p2", Nothing) (Snd "p1" (Var "v") Nil))
                 tp2 = case pro of
@@ -252,6 +237,67 @@ spec = do
                     _ -> (End, Boolean)
             tp1 `shouldBe` dualType tp2
 
+        it "fills subprocess and then infers the right missing channels" $ do
+            let sp = Par
+                        (Rec "p1" "_z"
+                            (Rec "_z" "j"
+                                (Rec "_z" "w"
+                                    (Snd "j" (Lit True)
+                                        (Snd "j" (Lit True)
+                                            (Snd "w" (Var "j") Nil)
+                                                )))))
+                        (Snd "p2" (Var "_y2")
+                            (Snd "_y1" (Var "c")
+                                (Snd "_y1" (Var "x1")
+                                    (Rec "d" "b1"
+                                        (Rec "d" "b2"
+                                            (Rec "x2" "z"
+                                                (Par 
+                                                    (Rec "z" "y" Nil)
+                                                    (Snd "d" (Lit True) Nil))
+                                                    ))))))
+                ctx = lfpFrom M.empty (deduce sp)
+                tx1 = get "_y1" ctx
+                tx2 = get "_y2" ctx
+            aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
+        
+        it "infers the right missing channels through fixpoint iteration" $ do
+            -- p2 >< p1 . x1 >< x2. c >< d.
+            let p = liftBindings $ fromRight' $ parseProcess "test" "x1 >< x2. c >< d.{p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
+                ctx = lfpFrom M.empty (dualNarrow "p1" "p2" . deduce p)
+                tx1 = get "p1" ctx
+                tx2 = get "p2" ctx
+            aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
+            -- ctx `shouldBe` M.empty
+
+        it "fills the missing types through fixpoint iteration" $ do
+            -- 
+            let p = liftBindings $ fromRight' $ parseProcess "test" "p2 >< p1 .x1 >< x2.x1 >< x2. c >< d.{p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true.0 | z >> y .0}"
+                ctx = infer p
+                tx1 = get "p1" ctx
+                tx2 = get "p2" ctx
+            aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
+            ctx `shouldBe` M.empty
+            -- let p' = fromRight' $ fillTypeHoles' (fromRight' . sample <$> ctx) p
+            -- p' `shouldBe` Nil
+        
+        -- it "fixpoint types test 3" $ do
+        --     -- p2 >< p1 . x1 >< x2. c >< d.
+        --     let p = liftBindings $ fromRight' $ parseProcess "test" "x1 >< x2. {p1 >> (j, w) . w << j.0} | p2 << (c, x1) . x2 >> z . z >> y .0"
+        --         ctx = lfpFrom M.empty (dualNarrow "p1" "p2" . deduce p)
+        --         tx1 = get "p1" ctx
+        --         tx2 = get "p2" ctx
+        --         ty2 = (Qualified Lin (Sending (Qualified Un ())))
+        --     aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
+        --     sample tx2 `shouldBe` Right
+        --         (Qualified Lin 
+        --             (Sending 
+                        
+        --                 End))
+        --     let p' = fromRight' $ fillTypeHoles' (fromRight' . sample <$> ctx) p
+        --     p' `shouldBe` Nil
+
+
     describe "Should compute correctly join of dual types" $ do
         it "computes binding types" $ do
             let x1 = Channel AnyQual ASend TopType NonLinear
@@ -271,17 +317,13 @@ spec = do
             let t1 = Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool NonLinear)) NonLinear
                 t2 = Channel AnyQual ARecv (Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)) NonLinear
             t1 /\ aDualType t2 `shouldBe` t1
-        
+
         it "synthetizes types from abstractions" $ do
-            let concrete = Qualified Lin 
+            let concrete = Qualified Lin
                     (Sending (Qualified Lin (Receiving Boolean (Qualified Lin (Receiving Boolean End)))) End)
                 abstract = Channel AnyQual ASend (Channel AnyQual ARecv ABool (Channel AnyQual ARecv ABool AEnd)) NonLinear
             concrete `shouldBe` fromRight' (sample abstract)
 
-        -- it "computes binding types that are passed in parallel"
-        --     let y1 = Channel AnyQual ASend ABool (Channel AnyQual ASend ABool NonLinear)
-        --     let y2 = TopType
-        --     let z = Channel AnyQual ARecv TopType (Channel AnyQual ARecv TopType NonLinear)
 
 
 

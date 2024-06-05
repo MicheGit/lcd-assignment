@@ -112,7 +112,7 @@ spec = do
             --                                                 (Rec "z" "y" Nil)
             --                                                     ))))))
             --                         ))))
-            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
+            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
                 pro = fromRight' $ preprocess parsed
             -- pro `shouldBe` expected
             let check = typeCheck pro
