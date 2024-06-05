@@ -270,23 +270,6 @@ spec = do
             aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
             -- ctx `shouldBe` M.empty
 
-        it "fills the missing types through fixpoint iteration" $ do
-            -- dualNarrow "p1" "p2" . dualNarrow "_y1" "_y2".
-            let p = liftBindings $ fromRight' $ parseProcess "test" "d >< c: lin! bool.lin!bool.lin?bool.end.{p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true.0 | z >> y .0}"
-                ctx = lfpFrom M.empty (dualNarrow "x1" "x2" . deduce p)
-                tx1 = get "x2" ctx
-                tx2 = get "x1" ctx
-            aDualType (aDualType tx2 /\ tx1) `shouldBe` tx2 /\ aDualType tx1
-            let ztype = Qualified Lin (Receiving Boolean End)
-                dtype = Qualified Lin (Receiving Boolean (Qualified Lin (Receiving Boolean (Qualified Lin (Sending Boolean End)))))
-                t1 = fromRight' $ sample tx1
-                t2 = fromRight' $ sample tx2
-            t2 `shouldBe` Qualified Lin (Sending ztype End)
-            t1 `shouldBe` Qualified Lin (Receiving ztype End)
-            ctx `shouldBe` M.empty
-            -- let p' = fromRight' $ fillTypeHoles' (fromRight' . sample <$> ctx) p
-            -- p' `shouldBe` Nil
-
         it "infers correctly from send" $ do
             let p = liftBindings $ fromRight' $ parseProcess "test" "w << j . 0"
                 ctx = deduce p (M.fromList

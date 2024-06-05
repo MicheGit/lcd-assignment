@@ -86,8 +86,14 @@ spec = do
                     (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x")))))
             check `shouldSatisfy` isRight
 
-        it "accepts tuple passing processes with type hint" $ do
+        it "accepts tuple passing processes with type hint linear" $ do
             let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (lin? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
+                pro = fromRight' $ preprocess parsed
+            let check = typeCheck pro
+            check `shouldSatisfy` isRight
+
+        it "accepts tuple passing processes with type hint" $ do
+            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (rec x.? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
                 pro = fromRight' $ preprocess parsed
             let check = typeCheck pro
             check `shouldSatisfy` isRight
@@ -120,7 +126,19 @@ spec = do
             let check = typeCheck pro
             check `shouldSatisfy` isRight
     
-        it "accepts send in nested thread" $ do
+        it "accepts linear channel becoming unrestricted" $ do
             let check = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"
+            check `shouldSatisfy` isRight
+        
+        it "accpets linear channel becoming unrestricted 2" $ do
+            let check = loadInfer "x1 >< x2: lin?bool.rec x.!end.x. x1 << true .x1 >> y.x1 >> y.0 | x2 >> z.0"
+            check `shouldSatisfy` isRight
+
+        it "refuses linear channel used more than once" $ do
+            let check = loadInfer "x1 >< x2: lin?bool.rec x.!bool.x . x1 << true . y1 >> y .0 | x2 >> y . x2 << true.0 | x2 >> w.x2 << true.0"
+            check `shouldSatisfy` isLeft
+        
+        it "accepts tuple sending two ending of a channel" $ do
+            let check = loadInfer "a1 >< a2 . a2 >> (y1, y2) . {y1 << false .0 | y2 >> z .0} | x1 >< x2 . a1 << (x1, x2) . 0"
             check `shouldSatisfy` isRight
 
