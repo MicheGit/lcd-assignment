@@ -1,14 +1,23 @@
 module SessionPi.Types where
 
 import SessionPi.Syntax
+    ( Restrictable(predicate),
+      SpiType(Qualified, Boolean),
+      Pretype(Sending, Receiving),
+      Qualifier(..),
+      Val(..),
+      Proc(..) )
 
-import qualified Data.Map as M
-import qualified Data.Set as S
+import Callstack (foldChoice, mapLeft, TypeErrorBundle)
+import Bisimulation ((~), Bisimulation (behave))
+
+import Control.Applicative (Alternative (empty, (<|>)))
 import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, rdeepseq, parList)
 import Text.Printf (printf)
-import Bisimulation ((~), Bisimulation (behave))
-import Control.Applicative (Alternative (empty, (<|>)))
+
+import qualified Data.Map as M
+import qualified Data.Set as S
 
 
 type Claim = (Val, SpiType)
@@ -39,7 +48,7 @@ ndsplit ctx =
      -- all possible splits that keep unrestricted channels in all contexts
      -- and distribute linear channels in the two results
 
-type TypeErrorBundle = String
+type TypeError = Char
 
 -- Type checking is modeled with context transition
 -- A context transition represents a condition that the context must satisfy
@@ -47,7 +56,7 @@ type TypeErrorBundle = String
 --  requirements.
 -- Context transitions are monads (as well as applicatives and functors), 
 --  so they can be chained together.
-newtype CT a = CT {unwrap :: Context -> Either TypeErrorBundle (a, Context)}
+newtype CT a = CT {unwrap :: Context -> TypeErrorBundle TypeError (a, Context)}
 
 -- A rule of the type \Gamma |- a
 --  where a = Proc | Claim
@@ -61,14 +70,14 @@ gammaPred q = require (predicate q) "Failed to type context, there are unused li
 
 -- The require function lifts boolean predicates over contexts to CTs.
 -- This function generalize all requirements over subsequent checking.
-require :: (Context -> Bool) -> TypeErrorBundle -> CT ()
+require :: (Context -> Bool) -> String -> CT ()
 require predicate e = do
     g <- liftPure predicate
     unless g $ throwError e
 
 -- The throwError function throws the error argument and appends the context
 --  that raised that error.
-throwError :: TypeErrorBundle -> CT a
+throwError :: String -> CT a
 throwError e = CT (\c -> do
     Left (printf "Error: %s\n\t within context: %s" e (show c)))
 
@@ -92,14 +101,14 @@ instance TypeCheck Claim where
 -- The liftC function lifts an Either predicate over contexts to a CT
 --  which is pure with regards to the context, i.e. it doesn't change
 --  the input context
-liftC :: (Context -> Either TypeErrorBundle a) -> CT a
+liftC :: (Context -> TypeErrorBundle TypeError a) -> CT a
 liftC f = CT (\c -> do
     a <- f c
     return (a, c))
 
 -- The liftEither function maps an Either object to a rule that always 
 --  ends up in that either without changing the context.
-liftEither :: Either TypeErrorBundle a -> CT a
+liftEither :: TypeErrorBundle TypeError a -> CT a
 liftEither = liftC . const
 
 -- Returns a context transition that does a side effect on the input 
@@ -163,7 +172,7 @@ dropLinear = sideEffect getUnrestricted
 
 -- The `fork` operator describes a sequent that needs 
 --  more premises. It describes which premises are to be checked.
-(-<) :: CT () -> [CT ()] -> CT [Either TypeErrorBundle ()]
+(-<) :: CT () -> [CT ()] -> CT [TypeErrorBundle TypeError ()]
 ct -< cts = do
     ct
     CT (\c -> do
@@ -173,7 +182,7 @@ ct -< cts = do
 -- The `join` operator combines the different premises 
 --  into one single thread of execution, requiring all premises
 --  to be truthy. The premises are evaluated in parallel by default.
-(>-) :: CT [Either TypeErrorBundle ()] -> CT () -> CT ()
+(>-) :: CT [TypeErrorBundle TypeError ()] -> CT () -> CT ()
 cts >- ct = do
     let evalIndependently = foldl (>>) (Right ()) . (`using` parList rdeepseq)
     res <- evalIndependently <$> cts
@@ -252,7 +261,7 @@ instance TypeCheck Proc where
         check p
 
 -- To check whether a process is well typed it is sufficient to check it against the empty context.
-typeCheck :: Proc -> Either TypeErrorBundle ()
+typeCheck :: Proc -> TypeErrorBundle TypeError ()
 typeCheck p = fst <$> unwrap (check p) M.empty
 
 -- Utilities
@@ -286,20 +295,5 @@ instance Alternative CT where
     CT f1 <|> CT f2 = CT (\c -> case f1 c of
             Right r -> Right r
             Left _ -> f2 c) 
-    
 
--- Folds all the eithers with Left as identity element,
---  resulting in an either with the list of all Lefts 
---  if there was no Right element, returns such Right otherwise.
-foldChoice :: [Either a b] -> Either [a] b
-foldChoice [] = Left []
-foldChoice (e:es) = case e of
-    Right r -> Right r
-    Left  l -> case foldChoice es of
-            Right r -> Right r
-            Left ls -> Left (l:ls)
--- Transforms an either's Left element.
-mapLeft :: (a -> a') -> Either a b -> Either a' b
-mapLeft f (Left l) = Left (f l)
-mapLeft _ (Right r) = Right r
 

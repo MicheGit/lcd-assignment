@@ -34,57 +34,6 @@ unlit :: Val -> Bool
 unlit (Lit l) = l
 unlit _ = undefined
 
-{- class Expr a where
-    fv :: a -> S.Set String
-    substitute :: a -> Val -> String -> a
-
-instance Expr Val where
-    fv :: Val -> S.Set String
-    fv (Var x) = S.singleton x
-    fv (Lit _) = mempty
-    substitute :: Val -> Val -> String -> Val
-    substitute (Lit l) _ _ = Lit l
-    substitute t@(Var x) v y
-        | x == y    = v
-        | otherwise = t
-
-
-instance Expr Proc where
-    fv :: Proc -> S.Set String
-    fv Nil = mempty
-    fv (Par p1 p2) = fv p1 `S.union` fv p2
-    fv (Snd x v p) = fv v `S.union` S.insert x (fv p)
-    fv (Rec x y p) = S.insert x $ S.delete y $ fv p
-    fv (Brn v p1 p2) = fv v `S.union` fv p1 `S.union` fv p2
-    fv (Bnd x y p) = S.delete x $ S.delete y $ fv p
-    substitute :: Proc -> Val -> String -> Proc
-    substitute Nil _ _ = Nil
-    substitute (Par p1 p2) v x = Par (substitute p1 v x) (substitute p2 v x)
-    substitute (Snd y u p) v x = Snd y' u' p'
-        where
-            y'  | x == y    = unvar v
-                | otherwise = y
-            u'  = substitute u v x
-            p'  = substitute p v x
-    substitute (Rec y z p) v x = Rec y' z p'
-        where
-            y'  | x == y    = unvar v
-                | otherwise = y
-            -- z'  = z -- perché non è una fv
-            p'  | x == z    = p
-                | otherwise = substitute p v x
-    substitute (Brn g p1 p2) v x = Brn g' p1' p2'
-        where
-            g'  = substitute g v x
-            p1' = substitute p1 v x
-            p2' = substitute p2 v x
-    substitute (Bnd y z p) v x = Bnd y z p'
-        where
-            -- y' = y -- perché non è una fv
-            -- z' = z -- perché non è una fv
-            p'  | x == z || x == y  = p
-                | otherwise         = substitute p v x -}
-
 -- TYPES
 
 data Qualifier where

@@ -2,6 +2,7 @@ module SessionPi.Runtime where
 
 
 import SessionPi.Syntax
+    ( Qualifier(Un, Lin), Val(Var), Proc(..), unlit )
 
 import Control.Exception (throw)
 import Control.Concurrent (MVar, putMVar, takeMVar, newEmptyMVar, myThreadId, forkFinally)
@@ -40,7 +41,6 @@ run' :: Proc -> ProcIO ()
 run' Nil = do
     logInfo "STOP"
     return ()
-
 run' (Brn g p1 p2) = do
     logInfo (printf "BRANCHING %s" (show g))
     cond <- unlit <$> eval g
@@ -48,7 +48,6 @@ run' (Brn g p1 p2) = do
     if cond
         then run' p1
         else run' p2
-
 run' (Par p1 p2) = do
     logInfo "FORK"
     end1 <- newEmptyMVar

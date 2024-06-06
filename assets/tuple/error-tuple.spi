@@ -1,0 +1,13 @@
+p2 >< p1 . 
+    x1 >< x2. 
+        c >< d :lin?bool.lin?bool.end . -- here I'm suggesting a wrong type 
+            { p1 >> (j, w) . 
+                j << true . 
+                    j << true . 
+                        w << j . 0
+            | p2 << (c, x1) . 
+                d >> b1 . 
+                    d >> b2 . 
+                        x2 >> z . 
+                            z >> y . 0 -- channel z is the third type of c, unbounded. 
+            }

@@ -7,7 +7,6 @@ import SessionPi.Preprocessing
 
 import Text.Megaparsec (parse, some)
 import Data.Either (isLeft)
-import SessionPi.Preprocessing (liftBindings)
 
 spec :: Spec
 spec = do

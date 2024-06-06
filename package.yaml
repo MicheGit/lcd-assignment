@@ -62,8 +62,8 @@ executables:
     source-dirs:         app
     ghc-options:
     - -threaded
+    - -with-rtsopts=-N
     - -rtsopts
-    - -with-rtsopts=-N4
     dependencies:
     - lcd-assignment
 

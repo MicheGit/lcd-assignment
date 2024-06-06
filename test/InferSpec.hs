@@ -3,7 +3,7 @@ import Test.Hspec (Spec, describe, it, shouldSatisfy, shouldBe)
 import SessionPi.Parser (parseProcess)
 import SessionPi.Syntax
 import SessionPi.Preprocessing
-import SessionPi.Abstraction
+import SessionPi.Infer
 import Data.Either (isRight, fromRight, Either (Right))
 import qualified Data.Map as M
 import Algebra.Lattice (Lattice((/\)))

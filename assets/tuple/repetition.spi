@@ -1,0 +1,12 @@
+y1 >< y2 .
+    x1 >< x2 : lin?bool.rec x. !bool.x .
+        { y1 << (true, x1) .
+            x2 >> g .
+                if g 
+                    then x2 << true . 0
+                    else 0
+        | y2 >> (d, c) .
+            c << d .
+                un c >> y . 0
+
+        }

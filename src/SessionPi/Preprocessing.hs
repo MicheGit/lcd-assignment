@@ -1,12 +1,21 @@
 module SessionPi.Preprocessing where
-import SessionPi.Syntax
-import SessionPi.Types (Context)
-import qualified Data.Map as M
-import SessionPi.Abstraction
-import Algebra.Lattice ((/\))
-import Callstack (addCallStack)
 
-preprocess :: Proc -> Either [String] Proc
+import SessionPi.Syntax ( Proc(..) )
+import SessionPi.Infer
+    ( Inferrable(deduce),
+      AContext,
+      AType(TopType, Channel, ABool, BotType),
+      Abstraction(sigma),
+      sample,
+      aDualType,
+      get,
+      dualNarrow,
+      lfpFrom )
+import Algebra.Lattice ((/\))
+import Callstack (addCallStack, TypeErrorBundle)
+import qualified Data.Map as M
+
+preprocess :: Proc -> TypeErrorBundle String Proc
 preprocess = fillTypeHoles . liftBindings
 
 -- bind is active in all parallel branches by definition, equivalently here we lift it to the parent node
@@ -56,9 +65,8 @@ fillTypeHoles' ctx (Rec q x y p) = do
             ABool -> BotType
             BotType -> BotType
             _ -> TopType
-    ty <- sample ety `addCallStack` ("Error sampling variable pass " ++ y ++ " sent by channel" ++ x ++ " from context " ++ show ctx)
+    ty <- sample ety `addCallStack` ("Error sampling variable pass " ++ y ++ " sent by channel " ++ x ++ " from context " ++ show ctx)
     Rec q x y <$> fillTypeHoles' (M.insert y (sigma ty) ctx) p
-
 fillTypeHoles' ctx (Par p1 p2) = do
     p1' <- fillTypeHoles' ctx p1
     p2' <- fillTypeHoles' ctx p2

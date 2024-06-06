@@ -1,11 +1,19 @@
-module SessionPi.Abstraction where
+module SessionPi.Infer where
 
 import SessionPi.Syntax
-import SessionPi.Types ( Claim, Context )
+    ( SpiType(..),
+      Pretype(..),
+      Qualifier(..),
+      Val(..),
+      Proc(..),
+      argument,
+      thenProcess )
+import SessionPi.Types ( Claim )
 
 import Algebra.Lattice (Lattice ((\/), (/\)), BoundedMeetSemiLattice (top), BoundedJoinSemiLattice (bottom), BoundedLattice)
-import qualified Data.Map as M
+
 import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
 
 class (BoundedLattice (AbstractDomain c)) => Abstraction c where
     type AbstractDomain c
@@ -109,17 +117,18 @@ sample ABool = Right Boolean
 sample AProc = sample NonLinear
 sample NonLinear = sample AEnd
 sample AEnd = Right End
-sample t@(Channel OnlyUnr a v p) | t /\ p /= BotType = do
-    sa <- sampleAction a
-    sv <- sample v
-    return (Recursive "x" (Qualified Un (sa sv (TypeVar "x"))))
+sample BotType = Left ["Sample bottom abstract type"]
 sample (Channel AnyQual a v p) = do
     sa <- sampleAction a
     sv <- sample v
     sp <- sample p
-    return (Qualified Lin (sa sv sp)) -- if it could be linear, then better to put linear
-sample BotType = Left ["Sample bottom abstract type"]
-sample t = Left ["Could not infer an useful type from " ++ show t ++ ". Please consider adding type annotations"]
+    return (Qualified Lin (sa sv sp))
+sample p@(Channel OnlyUnr _ _ q) = case q /\ p of
+    (Channel OnlyUnr a v _) -> do
+        sa <- sampleAction a
+        sv <- sample v
+        return (Recursive "x" (Qualified Un (sa sv (TypeVar "x"))))
+    _ -> Left ["Could not infer an useful type from " ++ show p ++ ". Please consider adding type annotations"]
 
 
 aDualType :: AType -> AType
@@ -168,6 +177,7 @@ instance BoundedJoinSemiLattice AType where
 
 instance Abstraction Val where
     type AbstractDomain Val = AContext -> AType
+    sigma :: Val -> AContext -> AType
     sigma (Var x) = get x
     sigma _ = const ABool
 

@@ -27,8 +27,7 @@ library
   exposed-modules:
       Bisimulation
       Callstack
-      Lib
-      SessionPi.Abstraction
+      SessionPi.Infer
       SessionPi.Parser
       SessionPi.Preprocessing
       SessionPi.Runtime
@@ -85,7 +84,7 @@ executable lcd-assignment-exe
       DeriveAnyClass
       TypeFamilies
       FlexibleContexts
-  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N4
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -with-rtsopts=-N -rtsopts
   build-depends:
       base >=4.7 && <5
     , containers

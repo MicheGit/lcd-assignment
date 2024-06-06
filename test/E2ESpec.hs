@@ -6,7 +6,7 @@ import SessionPi.Preprocessing (preprocess)
 import Data.Either ( isLeft, isRight )
 import qualified SessionPi.Types as T
 import qualified Data.Map as M
-import SessionPi.Syntax (SpiType(Recursive, Qualified, Boolean, End, TypeVar), Qualifier (Un, Lin), Pretype (Sending, Receiving), Proc(..), Val(..))
+import SessionPi.Syntax (SpiType(Recursive, Qualified, Boolean, End, TypeVar), Qualifier (Un, Lin), Pretype (Sending, Receiving), Proc(..))
 import Data.List (intercalate)
 import Callstack (fromRight')
 
@@ -23,80 +23,80 @@ spec :: Spec
 spec = do
     describe "Should be compliant to the examples in section 3" $ do
         it "refuses x1 >< x2 . x1 << true . 0 | x2 >> y . y << false . 0" $ do
-            let check = loadInfer "x1 >< x2 . x1 << true . 0 | x2 >> y . y << false . 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2 . x1 << true . 0 | x2 >> y . y << false . 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses x1 >< x2 . if x1 then 0 else 0" $ do
-            let check = loadInfer "x1 >< x2 . if x1 then 0 else 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2 . if x1 then 0 else 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses x >< x . x << true .0 | x >> y . 0" $ do
-            let check = loadInfer "x >< x . x << true .0 | x >> y . 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x >< x . x << true .0 | x >> y . 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses x1 >< x2: lin?bool.end . x1 << true . 0 | x2 >> y . y << false . 0" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.end . x1 << true . 0 | x2 >> y . y << false . 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2: lin?bool.end . x1 << true . 0 | x2 >> y . y << false . 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses x1 >< x2: end . if x1 then 0 else 0" $ do
-            let check = loadInfer "x1 >< x2: end . if x1 then 0 else 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2: end . if x1 then 0 else 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses x >< x: lin?bool.end . x << true .0 | x >> y . 0" $ do
-            let check = loadInfer "x >< x: lin?bool.end . x << true .0 | x >> y . 0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x >< x: lin?bool.end . x << true .0 | x >> y . 0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses two linears processes sending instances" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.end . x1 << true.0 | x1 << false.0 | x2 >> y .0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2: lin?bool.end . x1 << true.0 | x1 << false.0 | x2 >> y .0"
+            chk `shouldSatisfy` isLeft
 
         it "accepts three unrestricted processes sending instances" $ do
-            let check = loadInfer "x1 >< x2: rec x.?bool.x . x1 << true.0 | x1 << false.0 | x1 << true.0"
-            check `shouldBe` Right ()
+            let chk = loadInfer "x1 >< x2: rec x.?bool.x . x1 << true.0 | x1 << false.0 | x1 << true.0"
+            chk `shouldBe` Right ()
 
         it "accepts duality simple send/receive" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.end . x1 << true .0 | x2 >> z .0"
-            check `shouldBe` Right ()
+            let chk = loadInfer "x1 >< x2: lin?bool.end . x1 << true .0 | x2 >> z .0"
+            chk `shouldBe` Right ()
 
         it "accepts duality composed send/receive" $ do
-            let check = loadInfer "c1 >< c2: lin?bool.lin!bool.end . c1 << true . c1 >> w . 0 | c2 >> z . c2 << false.0"
-            check `shouldBe` Right ()
+            let chk = loadInfer "c1 >< c2: lin?bool.lin!bool.end . c1 << true . c1 >> w . 0 | c2 >> z . c2 << false.0"
+            chk `shouldBe` Right ()
 
         it "accepts duality uncompliant channels" $ do
-            let check = loadInfer "x1 >< x2 . x1 << true .0 | x2 << false .0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2 . x1 << true .0 | x2 << false .0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses duality uncompliant processes" $ do
-            let check = loadInfer "c1 >< c2 . c1 << true . c1 >> w . 0 | c2 >> z . c2 >> t.0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "c1 >< c2 . c1 << true . c1 >> w . 0 | c2 >> z . c2 >> t.0"
+            chk `shouldSatisfy` isLeft
 
         it "refuses something that would be accepted if the duality was applied to passed values too" $ do
-            let check = loadInfer "x1 >< x2 . y1 >< y2 . x1 << y2 .0 | x2 >> z . z << true .0 | y1 << false.0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2 . y1 >< y2 . x1 << y2 .0 | x2 >> z . z << true .0 | y1 << false.0"
+            chk `shouldSatisfy` isLeft
 
         it "accepts a well-typed deadlock" $ do
-            let check = loadInfer "x1 >< x2 . y1 >< y2 . x1 << true . y1 << false .0 | y2 >> x . x2 >> w .0"
-            check `shouldSatisfy` isRight
+            let chk = loadInfer "x1 >< x2 . y1 >< y2 . x1 << true . y1 << false .0 | y2 >> x . x2 >> w .0"
+            chk `shouldSatisfy` isRight
 
     describe "Should be compliant to the examples in section 4" $ do
 
         it "accepts a loop typed variable" $ do
             let process = fromRight' $ parseProcess "test" "x2 >> z . z << true.0 | x2 >> w . w << false.0"
-                check = T.unwrap (T.check process) (M.singleton "x2" (Recursive "x"
+                chk = T.unwrap (T.check process) (M.singleton "x2" (Recursive "x"
                     (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x")))))
-            check `shouldSatisfy` isRight
+            chk `shouldSatisfy` isRight
 
         it "accepts tuple passing processes with type hint linear" $ do
             let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (lin? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
                 pro = fromRight' $ preprocess parsed
-            let check = typeCheck pro
-            check `shouldSatisfy` isRight
+            let chk = typeCheck pro
+            chk `shouldSatisfy` isRight
 
         it "accepts tuple passing processes with type hint" $ do
             let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (rec x.? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
                 pro = fromRight' $ preprocess parsed
-            let check = typeCheck pro
-            check `shouldSatisfy` isRight
+            let chk = typeCheck pro
+            chk `shouldSatisfy` isRight
 
         it "accepts tuple passing processes" $ do
             -- let expected = Bnd ("p2",Nothing) ("p1",Nothing) 
@@ -123,24 +123,24 @@ spec = do
             let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
                 pro = fromRight' $ preprocess parsed
             -- pro `shouldBe` Nil
-            let check = typeCheck pro
-            check `shouldSatisfy` isRight
+            let chk = typeCheck pro
+            chk `shouldSatisfy` isRight
 
         it "accepts linear channel becoming unrestricted" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"
-            check `shouldSatisfy` isRight
+            let chk = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"
+            chk `shouldSatisfy` isRight
 
         it "accpets linear channel becoming unrestricted 2" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.rec x.!end.x. x1 << true .x1 >> y.x1 >> y.0 | x2 >> z.0"
-            check `shouldSatisfy` isRight
+            let chk = loadInfer "x1 >< x2: lin?bool.rec x.!end.x. x1 << true .x1 >> y.x1 >> y.0 | x2 >> z.0"
+            chk `shouldSatisfy` isRight
 
         it "refuses linear channel used more than once" $ do
-            let check = loadInfer "x1 >< x2: lin?bool.rec x.!bool.x . x1 << true . y1 >> y .0 | x2 >> y . x2 << true.0 | x2 >> w.x2 << true.0"
-            check `shouldSatisfy` isLeft
+            let chk = loadInfer "x1 >< x2: lin?bool.rec x.!bool.x . x1 << true . y1 >> y .0 | x2 >> y . x2 << true.0 | x2 >> w.x2 << true.0"
+            chk `shouldSatisfy` isLeft
 
         it "accepts tuple sending two ending of a channel" $ do
-            let check = loadInfer "a1 >< a2 . a2 >> (y1, y2) . {y1 << false .0 | y2 >> z .0} | x1 >< x2 . a1 << (x1, x2) . 0"
-            check `shouldSatisfy` isRight
+            let chk = loadInfer "a1 >< a2 . a2 >> (y1, y2) . {y1 << false .0 | y2 >> z .0} | x1 >< x2 . a1 << (x1, x2) . 0"
+            chk `shouldSatisfy` isRight
 
     describe "Should be compliant to examples in section 5" $ do
         it "refuses replication of nested linear channels" $ do
