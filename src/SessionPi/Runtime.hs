@@ -59,7 +59,6 @@ run' (Par p1 p2) = do
     takeMVar end1
     takeMVar end2
     return ()
-
 run' (Snd x v p) = do
     logInfo (printf "SENDING value %s over channel %s" (show v) x)
     chan <- channel x
@@ -68,12 +67,27 @@ run' (Snd x v p) = do
     chan `send` val
     logInfo "VALUE SENT"
     run' p
-run' (Rec x y p) = do
-    logInfo (printf "RECEIVING value %s over channel %s" y x)
+run' (Rec Lin x y p) = do
+    logInfo (printf "RECEIVING value %s over linear channel %s" y x)
     chan <- channel x
     val <- receive chan
     logInfo (printf "RECEIVED value %s" (show val))
     let ?variables = insert y val ?variables in run' p
+run' q@(Rec Un x y p) = do
+    logInfo (printf "RECEIVING value %s over unbounded channel %s" y x)
+    chan <- channel x
+    val <- receive chan
+    logInfo (printf "RECEIVED value %s" (show val))
+    logInfo "REPLICATING unbounded behaviour"
+    end1 <- newEmptyMVar
+    end2 <- newEmptyMVar
+    pid1 <- forkFinally (let ?variables = insert y val ?variables in run' p) $ notifyThreadEnd end1
+    pid2 <- forkFinally (run' q) $ notifyThreadEnd end2
+    logInfo (printf "REPLICATED processes with id %s and %s" (show pid1) (show pid2))
+    takeMVar end1
+    takeMVar end2
+    return ()
+    
 run' (Bnd (x, _) (y, _) p) = do
     logInfo (printf "BINDING channel ends %s and %s" x y)
     var <- newEmptyMVar

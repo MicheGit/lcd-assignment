@@ -4,7 +4,7 @@ import Bisimulation (Bisimulation (behave))
 
 data Proc where
     Snd :: String -> Val -> Proc -> Proc
-    Rec :: String -> String -> Proc -> Proc
+    Rec :: Qualifier -> String -> String -> Proc -> Proc
     Par :: Proc -> Proc -> Proc
     Brn :: Val -> Proc -> Proc -> Proc
     Nil :: Proc
@@ -135,17 +135,17 @@ dualType (Qualified q (Sending t1 t2)) = Qualified q (Receiving t1 (dualType t2)
 dualType (Recursive a p) = Recursive a (dualType p)
 dualType (TypeVar x) = TypeVar x
 
-class Unrestricted t where
-    unrestricted :: t -> Bool
+class Restrictable t where
+    predicate :: Qualifier -> t -> Bool
 
-instance Unrestricted SpiType where
-    unrestricted :: SpiType -> Bool
-    unrestricted (Qualified Lin _)  = False
-    unrestricted _                  = True
+instance Restrictable SpiType where
+    predicate :: Qualifier -> SpiType -> Bool
+    predicate Un (Qualified Lin _) = False
+    predicate _ _                  = True
 
-instance (Unrestricted t, Foldable f) => Unrestricted (f t) where
-    unrestricted :: f t -> Bool
-    unrestricted = all unrestricted
+instance (Restrictable t, Foldable f) => Restrictable (f t) where
+    predicate :: Qualifier -> f t -> Bool
+    predicate = all . predicate
 
 subsType :: String -> SpiType -> SpiType -> SpiType
 subsType x t (TypeVar y) | x == y = t

@@ -110,7 +110,7 @@ specLeaves = do
 
     describe "Should parse receive actions" $ do
         it "parses a receive" $ do
-            let expected = Right (Rec "x" "y" Nil)
+            let expected = Right (Rec Lin "x" "y" Nil)
             let result = parse receive "test" "x >> y .0"
             result `shouldBe` expected
 
@@ -156,12 +156,12 @@ specExpr = do
 
         it "parses two communicating processes with right par oper priority" $ do
             let result = parse process "test" "x >< y . x << true . 0 | y >> g . if g then 0 else 0"
-            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil)) (Rec "y" "g" (Brn (Var "g") Nil Nil)))
+            let expected = Right (Par (Bnd ("x", Nothing) ("y", Nothing) (Snd "x" (Lit True) Nil)) (Rec Lin "y" "g" (Brn (Var "g") Nil Nil)))
             result `shouldBe` expected
 
         it "parses two communicating processes" $ do
             let result = parse process "test" "x >< y . {x << true . 0 | y >> g . if g then 0 else 0}"
-            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec "y" "g" (Brn (Var "g") Nil Nil))))
+            let expected = Right (Bnd ("x", Nothing) ("y", Nothing) (Par (Snd "x" (Lit True) Nil) (Rec Lin "y" "g" (Brn (Var "g") Nil Nil))))
             result `shouldBe` expected
 
 specPrepro :: Spec
@@ -223,9 +223,9 @@ specSyntaxSugar = do
         it "parses a tuple receiving variables" $ do
             let result = parse parseLeaf "test" "x >> (y, z) . 0"
             let expected = Right 
-                    (Rec "x" "_z" 
-                        (Rec "_z" "y"
-                            (Rec "_z" "z" Nil)))
+                    (Rec Lin "x" "_z" 
+                        (Rec Lin "_z" "y"
+                            (Rec Lin "_z" "z" Nil)))
             result `shouldBe` expected
 
 specTypes :: Spec

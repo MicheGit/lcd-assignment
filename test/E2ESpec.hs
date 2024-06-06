@@ -1,7 +1,7 @@
 module E2ESpec (spec) where
 import Test.Hspec (Spec, describe, it, shouldSatisfy, shouldBe)
 import SessionPi.Parser (parseProcess)
-import SessionPi.Types (typeCheck, TypeErrorBundle)
+import SessionPi.Types (typeCheck, TypeErrorBundle, TypeCheck (check), CT (unwrap))
 import SessionPi.Preprocessing (preprocess)
 import Data.Either ( isLeft, isRight )
 import qualified SessionPi.Types as T
@@ -21,7 +21,7 @@ loadInfer = fromRight' . fmap (composeErrorBundle . preprocess) . parseProcess "
 
 spec :: Spec
 spec = do
-    describe "Should be complaint to the examples in section 3" $ do
+    describe "Should be compliant to the examples in section 3" $ do
         it "refuses x1 >< x2 . x1 << true . 0 | x2 >> y . y << false . 0" $ do
             let check = loadInfer "x1 >< x2 . x1 << true . 0 | x2 >> y . y << false . 0"
             check `shouldSatisfy` isLeft
@@ -78,7 +78,7 @@ spec = do
             let check = loadInfer "x1 >< x2 . y1 >< y2 . x1 << true . y1 << false .0 | y2 >> x . x2 >> w .0"
             check `shouldSatisfy` isRight
 
-    describe "Should be complaint to the examples in section 4" $ do
+    describe "Should be compliant to the examples in section 4" $ do
 
         it "accepts a loop typed variable" $ do
             let process = fromRight' $ parseProcess "test" "x2 >> z . z << true.0 | x2 >> w . w << false.0"
@@ -125,11 +125,11 @@ spec = do
             -- pro `shouldBe` Nil
             let check = typeCheck pro
             check `shouldSatisfy` isRight
-    
+
         it "accepts linear channel becoming unrestricted" $ do
             let check = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"
             check `shouldSatisfy` isRight
-        
+
         it "accpets linear channel becoming unrestricted 2" $ do
             let check = loadInfer "x1 >< x2: lin?bool.rec x.!end.x. x1 << true .x1 >> y.x1 >> y.0 | x2 >> z.0"
             check `shouldSatisfy` isRight
@@ -137,8 +137,26 @@ spec = do
         it "refuses linear channel used more than once" $ do
             let check = loadInfer "x1 >< x2: lin?bool.rec x.!bool.x . x1 << true . y1 >> y .0 | x2 >> y . x2 << true.0 | x2 >> w.x2 << true.0"
             check `shouldSatisfy` isLeft
-        
+
         it "accepts tuple sending two ending of a channel" $ do
             let check = loadInfer "a1 >< a2 . a2 >> (y1, y2) . {y1 << false .0 | y2 >> z .0} | x1 >< x2 . a1 << (x1, x2) . 0"
             check `shouldSatisfy` isRight
 
+    describe "Should be compliant to examples in section 5" $ do
+        it "refuses replication of nested linear channels" $ do
+            let parsed = preprocess $ fromRight' $ parseProcess "test" "un x2 >> z . c << true .0 | x1 << true.0 | x1 << true.0 "
+            parsed `shouldSatisfy` isRight
+            let tx2 = Recursive "x" (Qualified Un (Receiving Boolean (TypeVar "x")))
+                tx1 = Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x")))
+                chk = unwrap (check $ fromRight' parsed) $ M.fromList
+                    [ ("x2", tx2)
+                    , ("x1", tx1)
+                    , ("c", Qualified Lin (Sending Boolean End))
+                    ]
+            chk `shouldSatisfy` isLeft
+
+        it "accepts replication when passing channel instead" $ do
+            let parsed = preprocess $ fromRight' $ parseProcess "test" "un x2 >> z . z << true .0 "
+            parsed `shouldSatisfy` isRight
+            let chk = unwrap (check $ fromRight' parsed) $ M.singleton "x2" (Recursive "x" (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x"))))
+            chk `shouldSatisfy` isRight

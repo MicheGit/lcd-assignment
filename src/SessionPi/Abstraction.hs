@@ -211,13 +211,13 @@ instance Inferrable Proc where
             atv = sigma v ctx'
             atx = Channel AnyQual ASend atv atp
          in M.insert x atx ctx'
-    deduce (Rec x y p) ctx =
+    deduce (Rec q x y p) ctx =
         let ctx' = deduce p (M.delete x 
                             $ inferCommunication x (Var y) 
                             $ M.delete y ctx)
             atp = fromMaybe NonLinear (M.lookup x ctx')
             aty = fromMaybe AProc (M.lookup y ctx')
-            atx = Channel AnyQual ARecv aty atp
+            atx = Channel (sigma q) ARecv aty atp
          in M.insert x atx $ M.delete y ctx'
     deduce (Bnd (x1, t1) (x2, t2) p) ctx =
         let at1 = maybe TopType sigma t1

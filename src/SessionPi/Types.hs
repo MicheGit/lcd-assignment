@@ -8,6 +8,7 @@ import Control.Monad (when, unless)
 import Control.Parallel.Strategies (using, rdeepseq, parList)
 import Text.Printf (printf)
 import Bisimulation ((~), Bisimulation (behave))
+import Control.Applicative (Alternative (empty, (<|>)))
 
 
 type Claim = (Val, SpiType)
@@ -17,7 +18,7 @@ type Context = M.Map String SpiType
 
 -- Drops any linear claim in the context
 getUnrestricted :: Context -> Context
-getUnrestricted = M.filter unrestricted
+getUnrestricted = M.filter (predicate Un)
 
 -- Computes all possible distribution of linear variables in the context,
 --  i.e. it computes all possible splits of the "linear subset" of the context
@@ -30,8 +31,9 @@ ndsplit ctx =
         lins :: [Context]
         lins =
             (M.fromArgSet <$>) $
-            S.toList $       -- for all the
-            S.powerSet $     -- possible combination of
+            S.toList $       -- for all the       -- for all the       -- for all the       -- for all the
+                   -- for all the
+            S.powerSet $     -- possible combination of     -- possible combination of     -- possible combination of
             M.argSet lin     -- (claims with) linearly qualified types
      in [(unr `M.union` comb, unr `M.union` (lin `M.difference` comb)) | comb <- lins]
      -- all possible splits that keep unrestricted channels in all contexts
@@ -54,8 +56,8 @@ class TypeCheck a where
 
 -- Example: Un(\Gamma) represents the condition for which the context has only
 --  unrestricted claims, i.e. there are no unused linear channels.
-unGamma :: CT ()
-unGamma = require unrestricted "Failed to type context, there are unused linear channels"
+gammaPred :: Qualifier -> CT ()
+gammaPred q = require (predicate q) "Failed to type context, there are unused linear channels"
 
 -- The require function lifts boolean predicates over contexts to CTs.
 -- This function generalize all requirements over subsequent checking.
@@ -77,12 +79,12 @@ liftPure = liftC . (return .)
 instance TypeCheck Claim where
     check :: Claim -> CT ()
     -- Any literal value types boolean iff the context is unrestricted
-    check (Lit _, Boolean) = unGamma
+    check (Lit _, Boolean) = gammaPred Un
     -- Any variable types the type t iff an equivalent claim is present in the context (and the other claims are unrestricted)
     check (Var x, t) = do
         found <- get x
         when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
-        unGamma
+        gammaPred Un
     -- Any other check yields an error
     check c = throwError (printf "Tried to check %s, i.e. a literal with a channel type" (show c))
 
@@ -142,7 +144,7 @@ update :: String -> SpiType -> CT ()
 update k t = do
     may <- liftPure (M.lookup k)
     case may of
-        Just found -> unless (unrestricted t && found ~ t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
+        Just found -> unless (predicate Un t && found ~ t) (throwError $ printf "Error updating: %s found in context with type %s which is different from %s required" k (show found) (show t))
         Nothing    -> sideEffect (M.insert k t)
 
 -- Removes a variable claim from the context
@@ -153,7 +155,7 @@ delete = sideEffect . M.delete
 extract :: String -> CT SpiType
 extract k = do
     t <- get k
-    t <$ unless (unrestricted t) (delete k)
+    t <$ unless (predicate Un t) (delete k)
 
 -- Drops any linear claim in the context
 dropLinear :: CT ()
@@ -185,7 +187,7 @@ detach cts = return () -< cts >- return ()
 instance TypeCheck Proc where
     check :: Proc -> CT ()
     -- The inaction process is well typed when the context has no linear variables
-    check Nil = unGamma
+    check Nil = gammaPred Un
     -- The parallel process is whell typed when there exist two context splits typing the parallel
     -- Note that it requires only one split to be successful, as not in the default multiple-premises behaviour.
     check (Par p1 p2) = do
@@ -218,10 +220,13 @@ instance TypeCheck Proc where
     -- A receiving process is well typed iff the receiving channel is defined and its type is a qualified
     --  receiving pretype; furthermore it needs to update the channel's type and override the newly bound variable
     --  before type checking the subprocess.
-    check (Rec x y p) = do
+    check (Rec q1 x y p) = do
+        gammaPred q1 <|> throwError "Failed to type process: there are linear channels in replicated environment"
         t <- extract x
         (v, u) <- case behave t of
-            Just (u, Qualified _ (Receiving v _)) -> return (v, u)
+            Just (u, Qualified q2 (Receiving v _)) -> do
+                when (q1 == Un && q2 /= Un) $ throwError (printf "Failed to type replicating channel %s against linear type %s" x (show t))
+                return (v, u)
             b -> throwError (printf "Channel %s : %s does not behave like a receiving channel, but rather as %s" x (show t) (show b))
         update x u
         override y v
@@ -273,6 +278,15 @@ instance Monad CT where
     CT fa >>= f = CT (\c -> do
         (a, c') <- fa c
         unwrap (f a) c')
+
+instance Alternative CT where
+    empty :: CT a
+    empty = throwError "Undefined error"
+    (<|>) :: CT a -> CT a -> CT a
+    CT f1 <|> CT f2 = CT (\c -> case f1 c of
+            Right r -> Right r
+            Left _ -> f2 c) 
+    
 
 -- Folds all the eithers with Left as identity element,
 --  resulting in an either with the list of all Lefts 

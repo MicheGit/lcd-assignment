@@ -23,7 +23,7 @@ liftBindings (Par p1 p2) = b1 $ b2 p'
         p' = Par (liftBindings p1') (liftBindings p2')
 liftBindings Nil = Nil
 liftBindings (Snd x y p) = Snd x y (liftBindings p)
-liftBindings (Rec x y p) = Rec x y (liftBindings p)
+liftBindings (Rec q x y p) = Rec q x y (liftBindings p)
 liftBindings (Bnd x y p) = Bnd x y (liftBindings p)
 liftBindings (Brn g p1 p2) = Brn g (liftBindings p1) (liftBindings p2)
 
@@ -50,14 +50,14 @@ fillTypeHoles' ctx pr@(Bnd (x, _) (y, _) p) = do
     Bnd (x, Just tx) (y, Just ty) <$> fillTypeHoles' (M.insert x (sigma tx) $ M.insert y (sigma ty) ctx) p
 fillTypeHoles' _ Nil = return Nil
 fillTypeHoles' ctx (Snd x y p) = Snd x y <$> fillTypeHoles' ctx p
-fillTypeHoles' ctx (Rec x y p) = do
+fillTypeHoles' ctx (Rec q x y p) = do
     let ety = case get x ctx of
             Channel _ _ t _ -> t
             ABool -> BotType
             BotType -> BotType
             _ -> TopType
     ty <- sample ety `addCallStack` ("Error sampling variable pass " ++ y ++ " sent by channel" ++ x ++ " from context " ++ show ctx)
-    Rec x y <$> fillTypeHoles' (M.insert y (sigma ty) ctx) p
+    Rec q x y <$> fillTypeHoles' (M.insert y (sigma ty) ctx) p
 
 fillTypeHoles' ctx (Par p1 p2) = do
     p1' <- fillTypeHoles' ctx p1

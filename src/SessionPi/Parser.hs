@@ -7,10 +7,11 @@ import Data.Text (Text, pack)
 
 import Control.Monad (void, join)
 
-import Text.Megaparsec (Parsec, choice, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse, many)
+import Text.Megaparsec (Parsec, choice, MonadParsec (notFollowedBy), try, empty, (<|>), between, parse, many, optional)
 import qualified Text.Megaparsec.Error as E
 import qualified Text.Megaparsec.Char as C
 import qualified Text.Megaparsec.Char.Lexer as L
+import Data.Maybe (fromMaybe)
 
 -- Parser :: * -> *
 type Parser = Parsec
@@ -114,16 +115,17 @@ send = do
 
 receive :: Parser Proc
 receive = do
+    qual <- fromMaybe Lin <$> optional qualifier
     chn <- variable
     symbol ">>"
     do
         var <- variable
         symbol "."
-        Rec chn var <$> parseLeaf
+        Rec qual chn var <$> parseLeaf
         <|> do
             (v1, v2) <- tuple variable
             symbol "."
-            Rec chn "_z" . Rec "_z" v1 . Rec "_z" v2 <$> parseLeaf
+            Rec qual chn "_z" . Rec Lin "_z" v1 . Rec Lin "_z" v2 <$> parseLeaf
 
 
 tuple :: Parser t -> Parser (t, t)

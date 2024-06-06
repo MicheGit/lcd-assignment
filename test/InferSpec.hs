@@ -85,9 +85,9 @@ spec = do
 
         it "parses the some apparently unrelated types" $ do
             let p = Par
-                        (Rec "x2" "_z"
-                            (Rec "_z" "y"
-                                (Rec "_z" "z" Nil)))
+                        (Rec Lin "x2" "_z"
+                            (Rec Lin "_z" "y"
+                                (Rec Lin "_z" "z" Nil)))
                         (Snd "x1" (Var "_y2")
                             (Snd "_y1" (Lit True)
                                 (Snd "_y1" (Lit False) Nil)))
@@ -103,9 +103,9 @@ spec = do
 
         it "parses some related types" $ do
             let p = Bnd ("_y1", Nothing) ("_y2", Nothing) (Par
-                        (Rec "x2" "_z"
-                            (Rec "_z" "y"
-                                (Rec "_z" "z" Nil)))
+                        (Rec Lin "x2" "_z"
+                            (Rec Lin "_z" "y"
+                                (Rec Lin "_z" "z" Nil)))
                         (Snd "x1" (Var "_y2")
                             (Snd "_y1" (Lit True)
                                 (Snd "_y1" (Lit False) Nil))))
@@ -119,9 +119,9 @@ spec = do
 
         it "parses the some tight related types" $ do
             let p = Par
-                        (Rec "x2" "_z"
-                            (Rec "_z" "y"
-                                (Rec "_z" "z" Nil)))
+                        (Rec Lin "x2" "_z"
+                            (Rec Lin "_z" "y"
+                                (Rec Lin "_z" "z" Nil)))
                         (Snd "x1" (Var "_y2")
                             (Snd "_y1" (Lit True)
                                 (Snd "_y1" (Lit False) Nil)))
@@ -157,9 +157,9 @@ spec = do
                         ("_y1", Just hiddenSendType)
                         ("_y2", Just hiddenRecvType)
                         (Par
-                            (Rec "x2" "_z"
-                                (Rec "_z" "y"
-                                    (Rec "_z" "z" Nil)))
+                            (Rec Lin "x2" "_z"
+                                (Rec Lin "_z" "y"
+                                    (Rec Lin "_z" "z" Nil)))
                             (Snd "x1" (Var "_y2")
                                 (Snd "_y1" (Lit True)
                                     (Snd "_y1" (Lit False) Nil)))))
@@ -215,9 +215,9 @@ spec = do
                             (Bnd ("x1", Nothing) ("x2", Nothing)
                                 (Bnd ("c", Nothing) ("d", Nothing)
                                     (Par
-                                    (Rec "p1" "_z"
-                                        (Rec "_z" "j"
-                                            (Rec "_z" "w"
+                                    (Rec Lin "p1" "_z"
+                                        (Rec Lin "_z" "j"
+                                            (Rec Lin "_z" "w"
                                                 (Snd "j" (Lit True)
                                                     (Snd "j" (Lit True)
                                                         (Snd "w" (Var "j") Nil)
@@ -225,10 +225,10 @@ spec = do
                                     (Snd "p2" (Var "_y2")
                                         (Snd "_y1" (Var "c")
                                             (Snd "_y1" (Var "x1")
-                                                (Rec "d" "b1"
-                                                    (Rec "d" "b2"
-                                                        (Rec "x2" "z"
-                                                            (Rec "z" "y" Nil)
+                                                (Rec Lin "d" "b1"
+                                                    (Rec Lin "d" "b2"
+                                                        (Rec Lin "x2" "z"
+                                                            (Rec Lin "z" "y" Nil)
                                                                 ))))))
                                     ))))
                 pro = fromRight' $ preprocess p
@@ -239,9 +239,9 @@ spec = do
 
         it "fills subprocess and then infers the right missing channels" $ do
             let sp = Par
-                        (Rec "p1" "_z"
-                            (Rec "_z" "j"
-                                (Rec "_z" "w"
+                        (Rec Lin "p1" "_z"
+                            (Rec Lin "_z" "j"
+                                (Rec Lin "_z" "w"
                                     (Snd "j" (Lit True)
                                         (Snd "j" (Lit True)
                                             (Snd "w" (Var "j") Nil)
@@ -249,11 +249,11 @@ spec = do
                         (Snd "p2" (Var "_y2")
                             (Snd "_y1" (Var "c")
                                 (Snd "_y1" (Var "x1")
-                                    (Rec "d" "b1"
-                                        (Rec "d" "b2"
-                                            (Rec "x2" "z"
+                                    (Rec Lin "d" "b1"
+                                        (Rec Lin "d" "b2"
+                                            (Rec Lin "x2" "z"
                                                 (Par
-                                                    (Rec "z" "y" Nil)
+                                                    (Rec Lin "z" "y" Nil)
                                                     (Snd "d" (Lit True) Nil))
                                                     ))))))
                 ctx = lfpFrom M.empty (deduce sp)
@@ -281,9 +281,9 @@ spec = do
 
         it "infers correctly from multiple send" $ do
             let p = Par
-                        (Rec "p1" "_z"
-                            (Rec "_z" "j"
-                                (Rec "_z" "w"
+                        (Rec Lin "p1" "_z"
+                            (Rec Lin "_z" "j"
+                                (Rec Lin "_z" "w"
                                     (Snd "j" (Lit True)
                                         (Snd "j" (Lit True)
                                             (Snd "w" (Var "j") Nil)
@@ -291,11 +291,11 @@ spec = do
                         (Snd "p2" (Var "_y2")
                             (Snd "_y1" (Var "c")
                                 (Snd "_y1" (Var "x1")
-                                    (Rec "d" "b1"
-                                        (Rec "d" "b2"
-                                            (Rec "x2" "z"
+                                    (Rec Lin "d" "b1"
+                                        (Rec Lin "d" "b2"
+                                            (Rec Lin "x2" "z"
                                                 (Par
-                                                    (Rec "z" "y" Nil)
+                                                    (Rec Lin "z" "y" Nil)
                                                     (Snd "d" (Lit True) Nil))
                                                     ))))))
 
