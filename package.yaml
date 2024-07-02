@@ -64,6 +64,8 @@ executables:
     - -threaded
     - -with-rtsopts=-N
     - -rtsopts
+    - -O2
+    - -eventlog
     dependencies:
     - lcd-assignment
 

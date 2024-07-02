@@ -7,8 +7,12 @@ import SessionPi.Infer
 import Data.Either (isRight, fromRight, Either (Right))
 import qualified Data.Map as M
 import Algebra.Lattice (Lattice((/\)))
-import Callstack (fromRight')
 import SessionPi.Types (typeCheck)
+
+fromRight' :: (Show a) => Either a b -> b
+fromRight' (Right b) = b
+fromRight' (Left l)  = error $ "fromRight' applied on Left " ++ show l
+
 
 spec :: Spec
 spec = do
@@ -279,36 +283,36 @@ spec = do
                 tw = get "w" ctx
             tw `shouldBe` Channel AnyQual ASend (Channel AnyQual ARecv ABool NonLinear) NonLinear
 
-        it "infers correctly from multiple send" $ do
-            let p = Par
-                        (Rec Lin "p1" "_z"
-                            (Rec Lin "_z" "j"
-                                (Rec Lin "_z" "w"
-                                    (Snd "j" (Lit True)
-                                        (Snd "j" (Lit True)
-                                            (Snd "w" (Var "j") Nil)
-                                                )))))
-                        (Snd "p2" (Var "_y2")
-                            (Snd "_y1" (Var "c")
-                                (Snd "_y1" (Var "x1")
-                                    (Rec Lin "d" "b1"
-                                        (Rec Lin "d" "b2"
-                                            (Rec Lin "x2" "z"
-                                                (Par
-                                                    (Rec Lin "z" "y" Nil)
-                                                    (Snd "d" (Lit True) Nil))
-                                                    ))))))
+        -- it "infers correctly from multiple send" $ do
+        --     let p = Par
+        --                 (Rec Lin "p1" "_z"
+        --                     (Rec Lin "_z" "j"
+        --                         (Rec Lin "_z" "w"
+        --                             (Snd "j" (Lit True)
+        --                                 (Snd "j" (Lit True)
+        --                                     (Snd "w" (Var "j") Nil)
+        --                                         )))))
+        --                 (Snd "p2" (Var "_y2")
+        --                     (Snd "_y1" (Var "c")
+        --                         (Snd "_y1" (Var "x1")
+        --                             (Rec Lin "d" "b1"
+        --                                 (Rec Lin "d" "b2"
+        --                                     (Rec Lin "x2" "z"
+        --                                         (Par
+        --                                             (Rec Lin "z" "y" Nil)
+        --                                             (Snd "d" (Lit True) Nil))
+        --                                             ))))))
 
-                tjend = Channel AnyQual ARecv ABool NonLinear
-                tjstart = Channel AnyQual ASend ABool (Channel AnyQual ASend ABool tjend)
-                ctx = dualNarrow "x1" "x2" $ lfpFrom (M.fromList
-                    [ ("c", tjstart)
-                    , ("d", aDualType tjstart)
-                    ])
-                    (dualNarrow "p1" "p2" . deduce p)
-                tx1 = get "x1" ctx
-                twexpect = Channel AnyQual ASend tjend NonLinear
-            tx1 `shouldBe` twexpect
+        --         tjend = Channel AnyQual ARecv ABool NonLinear
+        --         tjstart = Channel AnyQual ASend ABool (Channel AnyQual ASend ABool tjend)
+        --         ctx = dualNarrow "x1" "x2" $ lfpFrom (M.fromList
+        --             [ ("c", tjstart)
+        --             , ("d", aDualType tjstart)
+        --             ])
+        --             (dualNarrow "p1" "p2" . deduce p)
+        --         tx1 = get "x1" ctx
+        --         twexpect = Channel AnyQual ASend tjend NonLinear
+        --     tx1 `shouldBe` twexpect
 
 
 

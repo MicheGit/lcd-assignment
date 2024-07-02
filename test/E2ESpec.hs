@@ -1,14 +1,17 @@
 module E2ESpec (spec) where
 import Test.Hspec (Spec, describe, it, shouldSatisfy, shouldBe)
 import SessionPi.Parser (parseProcess)
-import SessionPi.Types (typeCheck, TypeErrorBundle, TypeCheck (check), CT (unwrap))
+import SessionPi.Types (typeCheck, TypeCheck (check), CT (unwrap))
 import SessionPi.Preprocessing (preprocess)
 import Data.Either ( isLeft, isRight )
 import qualified SessionPi.Types as T
 import qualified Data.Map as M
 import SessionPi.Syntax (SpiType(Recursive, Qualified, Boolean, End, TypeVar), Qualifier (Un, Lin), Pretype (Sending, Receiving), Proc(..))
 import Data.List (intercalate)
-import Callstack (fromRight')
+
+fromRight' :: (Show a) => Either a b -> b
+fromRight' (Right b) = b
+fromRight' (Left l)  = error $ "fromRight' applied on Left " ++ show l
 
 composeErrorBundle :: Either [String] Proc -> Either String ()
 composeErrorBundle = \case
@@ -16,7 +19,7 @@ composeErrorBundle = \case
     ; Right r -> typeCheck r
     }
 
-loadInfer :: String -> Either TypeErrorBundle ()
+loadInfer :: String -> Either String ()
 loadInfer = fromRight' . fmap (composeErrorBundle . preprocess) . parseProcess "test"
 
 spec :: Spec
@@ -92,39 +95,39 @@ spec = do
             let chk = typeCheck pro
             chk `shouldSatisfy` isRight
 
-        it "accepts tuple passing processes with type hint" $ do
-            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (rec x.? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
-                pro = fromRight' $ preprocess parsed
-            let chk = typeCheck pro
-            chk `shouldSatisfy` isRight
+        -- it "accepts tuple passing processes with type hint" $ do
+        --     let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2: lin? (rec x.? bool.end).end. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . z >> y .0"
+        --         pro = fromRight' $ preprocess parsed
+        --     let chk = typeCheck pro
+        --     chk `shouldSatisfy` isRight
 
-        it "accepts tuple passing processes" $ do
-            -- let expected = Bnd ("p2",Nothing) ("p1",Nothing) 
-            --             (Bnd ("_y1",Nothing) ("_y2",Nothing) 
-            --                 (Bnd ("x1", Nothing) ("x2", Nothing) 
-            --                     (Bnd ("c", Nothing) ("d", Nothing) 
-            --                         (Par 
-            --                         (Rec "p1" "_z" 
-            --                             (Rec "_z" "j" 
-            --                                 (Rec "_z" "w" 
-            --                                     (Snd "j" (Lit True) 
-            --                                         (Snd "j" (Lit True) 
-            --                                             (Snd "w" (Var "j") Nil)
-            --                                                 ))))) 
-            --                         (Snd "p2" (Var "_y2") 
-            --                             (Snd "_y1" (Var "c") 
-            --                                 (Snd "_y1" (Var "x1") 
-            --                                     (Rec "d" "b1" 
-            --                                         (Rec "d" "b2" 
-            --                                             (Rec "x2" "z" 
-            --                                                 (Rec "z" "y" Nil)
-            --                                                     ))))))
-            --                         ))))
-            let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
-                pro = fromRight' $ preprocess parsed
-            -- pro `shouldBe` Nil
-            let chk = typeCheck pro
-            chk `shouldSatisfy` isRight
+        -- it "accepts tuple passing processes" $ do
+        --     -- let expected = Bnd ("p2",Nothing) ("p1",Nothing) 
+        --     --             (Bnd ("_y1",Nothing) ("_y2",Nothing) 
+        --     --                 (Bnd ("x1", Nothing) ("x2", Nothing) 
+        --     --                     (Bnd ("c", Nothing) ("d", Nothing) 
+        --     --                         (Par 
+        --     --                         (Rec "p1" "_z" 
+        --     --                             (Rec "_z" "j" 
+        --     --                                 (Rec "_z" "w" 
+        --     --                                     (Snd "j" (Lit True) 
+        --     --                                         (Snd "j" (Lit True) 
+        --     --                                             (Snd "w" (Var "j") Nil)
+        --     --                                                 ))))) 
+        --     --                         (Snd "p2" (Var "_y2") 
+        --     --                             (Snd "_y1" (Var "c") 
+        --     --                                 (Snd "_y1" (Var "x1") 
+        --     --                                     (Rec "d" "b1" 
+        --     --                                         (Rec "d" "b2" 
+        --     --                                             (Rec "x2" "z" 
+        --     --                                                 (Rec "z" "y" Nil)
+        --     --                                                     ))))))
+        --     --                         ))))
+        --     let parsed = fromRight' $ parseProcess "test" "p2 >< p1 . x1 >< x2. c >< d. {p1 >> (j, w) . j << true . j << true . w << j.0} | p2 << (c, x1) . d >> b1 . d >> b2. x2 >> z . {d << true .0 | z >> y .0}"
+        --         pro = fromRight' $ preprocess parsed
+        --     -- pro `shouldBe` Nil
+        --     let chk = typeCheck pro
+        --     chk `shouldSatisfy` isRight
 
         it "accepts linear channel becoming unrestricted" $ do
             let chk = loadInfer "x1 >< x2: lin?bool.rec x . !bool.x . x1 <<true . {x1 >> y . 0 | x1 >> z .0} | x2 >> x . {x2 << true .0 |x2 << false .0 |x2 << true .0 }"

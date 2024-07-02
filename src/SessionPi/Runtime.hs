@@ -49,7 +49,7 @@ run' (Brn g p1 p2) = do
         then run' p1
         else run' p2
 run' (Par p1 p2) = do
-    logInfo "FORK"
+    -- logInfo "FORK"
     end1 <- newEmptyMVar
     end2 <- newEmptyMVar
     pid1 <- forkFinally (run' p1) $ notifyThreadEnd end1
@@ -86,7 +86,6 @@ run' q@(Rec Un x y p) = do
     takeMVar end1
     takeMVar end2
     return ()
-    
 run' (Bnd (x, _) (y, _) p) = do
     logInfo (printf "BINDING channel ends %s and %s" x y)
     var <- newEmptyMVar

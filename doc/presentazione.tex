@@ -17,19 +17,19 @@
 \lstdefinelanguage{pilang}
 {
   % list of keywords
-  basicstyle=\ttfamily,
+  % basicstyle=\ttfamily,
   morekeywords={
-    if,
+  if,
 	then,
 	else,
 	true,
 	false
   },
-  sensitive=true, % keywords are not case-sensitive
+  sensitive=true, % keywords are case-sensitive
   morecomment=[l]{//}, % l is for line comment
   morecomment=[s]{/*}{*/}, % s is for start and end delimiter
-  morestring=[b]", % defines that strings are enclosed in double quotes
-  keywordstyle={\color{purple}\bfseries}
+  %morestring=[b]", % defines that strings are enclosed in double quotes
+  keywordstyle=\color{purple}\bfseries
 }
 
 % simboli
@@ -63,8 +63,8 @@
 	\end{frame}
 
     \input{src/0-outline.tex}
-    \input{src/1-basics.tex}
-    % \input{src/language.tex}
-	% \input{src/implementation.tex}
-	% \input{src/performing-analysis.tex}
+    \input{src/1-language-runtime.tex}
+    % \input{src/2-basic-types.tex}
+    % \input{src/3-recursive-types.tex}
+    % \input{src/4-replication.tex}
 \end{document}

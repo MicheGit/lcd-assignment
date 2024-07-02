@@ -3,7 +3,21 @@
 # For more information, please see the documentation at:
 #   https://docs.haskellstack.org/en/stable/lock_files
 
-packages: []
+packages:
+- completed:
+    hackage: ghc-events-0.18.0@sha256:82ddf7a0c36fb9b92dde6c9ac2c868db6fd21a708d92c5a6e25916f23aaf6e16,3830
+    pantry-tree:
+      sha256: fd1f15984bedc17b4f3dabafb6aeb12f40d0929e14a6cecd0f4be0091a7b30cb
+      size: 4297
+  original:
+    hackage: ghc-events-0.18.0@sha256:82ddf7a0c36fb9b92dde6c9ac2c868db6fd21a708d92c5a6e25916f23aaf6e16,3830
+- completed:
+    hackage: template-haskell-2.18.0.0@sha256:6cb4f8bb2e5641eb8c931105adc7184114ed42c501675779a2e8695c2d0a7975,2152
+    pantry-tree:
+      sha256: e915b412008449fdcd8b839869a4edc9a6bc29e5ee5ec80067661bf6954424e5
+      size: 921
+  original:
+    hackage: template-haskell-2.18.0.0@sha256:6cb4f8bb2e5641eb8c931105adc7184114ed42c501675779a2e8695c2d0a7975,2152
 snapshots:
 - completed:
     sha256: a81fb3877c4f9031e1325eb3935122e608d80715dc16b586eb11ddbff8671ecd
