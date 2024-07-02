@@ -1,6 +1,10 @@
 -- Should type with element given in chapter 4
 a1 >< a2: lin?bool.end .
 b1 >< b2: lin?bool.end .
+c1 >< c2: lin?bool.end .
+d1 >< d2: lin?bool.end .
+e1 >< e2: lin?bool.end .
+f1 >< f2: lin?bool.end .
 x >< y: rec x. ?bool.x .
     x1 >< y1: lin?bool.lin!bool.end .
         x2 >< y2: lin?bool.lin!bool.end .
@@ -10,4 +14,8 @@ x >< y: rec x. ?bool.x .
                 else 0
             | x1 << true . x1 >> n . y2 >> n . y2 << n .0
             | y1 >> n . y1 << false . x2 << false . x2 >> n .0
+            | a1 << true . b1 << true . c1 << true . d1 << true . e1 << true . f1 << true . 0
+            | a2 >> e . b2 >> e . c2 >> e . d2 >> e . e2 >> e . 
+                0 -- to not compile
+                -- f2 >> e . 0 -- to compile
             }

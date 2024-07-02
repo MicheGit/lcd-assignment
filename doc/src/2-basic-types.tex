@@ -1,0 +1,140 @@
+\section{Types}
+
+\subsection{Basic types}
+
+\begin{frame}{Basic Types - Syntax}
+    % TODO split in due colonne, riportare in una quella originale di vasconcelos e nell'altra quella implementata
+    Implementation of qualifier, pretypes and types are fully compliant to Chapter 3's original syntax:
+    \begin{minipage}{\textwidth}
+        \begin{minipage}{0.45\textwidth}
+            \begin{flalign*}
+                q ::= & lin \\
+                & un \\
+                p ::= & ?T.T \\
+                & !T.T \\
+            \end{flalign*}
+        \end{minipage}
+        \begin{minipage}{0.45\textwidth}
+            \begin{flalign*}
+                T :== & bool \\
+                & end \\
+                & q p \\
+                \Gamma ::= & \emptyset \\
+                & \Gamma , x : T 
+            \end{flalign*}
+        \end{minipage}
+    \end{minipage}
+    Contexts are implemented as hash maps of types
+\end{frame}
+
+\begin{frame}[fragile]{Basic Types - Duality}
+    Duality is partially defined as follows:
+    \begin{minted}{hs}
+    dualType :: SpiType -> SpiType
+    dualType End = End
+    dualType Boolean = error "..."
+    dualType (Qualified q (Receiving t1 t2)) = 
+        Qualified q (Sending t1 (dualType t2))
+    dualType (Qualified q (Sending t1 t2)) = 
+        Qualified q (Receiving t1 (dualType t2))
+    dualType (Recursive a p) = Recursive a (dualType p)
+    dualType (TypeVar x) = TypeVar 
+    \end{minted}
+\end{frame}
+
+
+% \begin{frame}{Language - Precomputation}
+%     After parsing, the program is precomputed lifting all bindings over all parallel compositions, as expressed in the following \textbf{structural congruence}: 
+%     \[ (\nu x y) P | Q \equiv (\nu x y) (P | Q) \]
+% \end{frame}
+
+% \begin{frame}[fragile]{Language - Operational Semantics}
+%     The code interpreter prints debug information about the program executed, along with a timestamp and a description of what the process did at that time.
+
+%     \begin{block}{Output format}
+%         \begin{lstlisting}
+% [TIMESTAMP | ThreadId THREAD_ID]: MESSAGE
+%         \end{lstlisting}
+%     \end{block}
+
+%     Program behaviour is defined according to the \textbf{operational semantics} presented in chapter 2.
+% \end{frame}
+
+% \subsection{Runtime}
+
+% \begin{frame}{Runtime - Concurrent Haskell}
+
+%     The language runtime is implemented in concurrent Haskell, using:
+%     \begin{itemize}
+%         \item the \texttt{IO} monad, along with a local state that maps variables to channels and literals, to model threads;
+%         \item and the \texttt{MVar} type to model channels.
+%     \end{itemize}
+
+%     Each thread is created with the \[ \texttt{forkIO :: IO () -> IO ThreadId} \] function, that simply creates a new thread, returning its id. % NO default AWAIT
+    
+% \end{frame}
+
+% \begin{frame}{Runtime - Channels (1/2)}
+%     Plain \texttt{MVar}s can await for value insertion with the function \[ \texttt{takeMVar :: MVar a -> IO a} \] but the dual operation \[ \texttt{putMVar :: MVar a -> a -> IO ()} \] does not await the variable to be ready to accept a new value.
+% \end{frame}
+
+
+% \begin{frame}{Runtime - Channels (2/2)}
+%     Channels are represented as tuples of \texttt{MVar}, meaning \texttt{(value, idle)}:
+%     \begin{itemize}
+%         \item \texttt{value :: MVar }$v$, containing the passed value, which needs to be evaluated;
+%         \item \texttt{idle :: MVar ()}, which has a \texttt{()} value in it when the channel is ready to receive.
+%     \end{itemize}
+%     Then, the \texttt{Channel} datatype further distinguishes whether it is a read end or a write end. Read ends and write ends share the same \texttt{MVar}s.
+% \end{frame}
+
+% \begin{frame}{Runtime - Program Behaviour (1/3)}
+%     \begin{block}{Inaction}
+%         The process $0$ just prints \texttt{STOP} and ends the thread.
+%     \end{block}
+
+%     \begin{block}{Branching}
+%         The process $\texttt{if }v\texttt{ then }P_1\texttt{ else }P_2$ prints two debug messages, both starting with \texttt{BRANCHING}:
+%         \begin{itemize}
+%             \item the guard before evaluation;
+%             \item and then, after evaluation in the local state.
+%         \end{itemize}
+%         After that, the run continues as the appropriate process.
+%     \end{block}
+% \end{frame}
+
+% \begin{frame}{Runtime - Program Behaviour (2/3)}
+%     \begin{block}{Binding}
+%         The process $(\nu x y) . P$ just prints \texttt{BINDING} followed by the two bounded variables. Then, it creates two \texttt{MVar}s, one for the value and one for the lock and associates in the local state both variables with the respective ends.
+
+%         The run proceeds in the same thread as prescribed by $P$.
+%     \end{block}
+
+%     \begin{block}{Fork}
+%         The process $P_1 | P_2$ prints \texttt{FORK} followed by the two new processes ids.
+
+%         To prevent a concurrent program to end before all forked threads terminate, this code constructs two \texttt{MVar}s that are notified when the two new threads finish. This process doesn't do anything more than awaiting for both threads to finish.
+%     \end{block}
+% \end{frame}
+
+% \begin{frame}{Runtime - Program Behaviour (3/3)}
+%     \begin{block}{Sending}
+%         The process $\overline{x} v . P$ prints \texttt{SENDING} followed by the value: 
+%         \begin{itemize}
+%             \item before evaluation;
+%             \item and after evaluation.
+%         \end{itemize}
+        
+%         Then the process sends the value over the channel $x$ and proceeds as prescribed by P.
+%     \end{block}
+
+%     \begin{block}{Receiving}
+%         The process $x(v) . P$ prints \texttt{RECEIVING} followed by: 
+%         \begin{itemize}
+%             \item the newly bound variable name;
+%             \item and the value received.
+%         \end{itemize}
+        
+%         Then the process proceeds as prescribed by P.
+%     \end{block}
+% \end{frame}

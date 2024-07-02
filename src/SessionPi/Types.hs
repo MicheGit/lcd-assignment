@@ -18,6 +18,7 @@ import Text.Printf (printf)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Functor ((<&>))
 
 
 type Claim = (Val, SpiType)
@@ -184,9 +185,10 @@ ct -< cts = do
 --  to be truthy. The premises are evaluated in parallel by default.
 (>-) :: CT [TypeErrorBundle TypeError ()] -> CT () -> CT ()
 cts >- ct = do
-    let evalIndependently = foldl (>>) (Right ()) . (`using` parList rdeepseq)
-    res <- evalIndependently <$> cts
+    let allRight = foldl (>>) (Right ()) -- . (`using` parList rdeepseq)
+    res <- allRight <$> cts
     liftEither res >> ct
+infix 0 >-
 
 -- Simply run in parallel different premises with the given context unchanged.
 detach :: [CT ()] -> CT ()
@@ -201,12 +203,12 @@ instance TypeCheck Proc where
     -- Note that it requires only one split to be successful, as not in the default multiple-premises behaviour.
     check (Par p1 p2) = do
         splits <- liftPure ndsplit
-        let cand c1 c2 = detach [ c1 |> check p1, c2 |> check p2 ]
+        let cand c1 c2 = (return () -< [ c1 |> check p1, c2 |> check p2 ] <&> (`using` parList rdeepseq)) >- return ()
         runs <- return () -< (uncurry cand <$> splits)
-        let results = runs `using` parList rdeepseq
+        let results = runs -- `using` parList rdeepseq
             outcome = foldChoice results
-            ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
-        liftEither (mapLeft ppsplit outcome)
+            -- ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
+        liftEither (mapLeft (const "No context split typed both processes.") outcome)
     -- A bind is well typed iff the subprocess is well typed overriding the definitions of the bounded variables.
     check (Bnd (x, Just tx) (y, Just ty) p) = do
         override x tx

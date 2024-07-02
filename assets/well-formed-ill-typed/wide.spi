@@ -1,0 +1,9 @@
+a1 >< a2: lin?bool.end .
+b1 >< b2: lin?bool.end .
+c1 >< c2: lin?bool.end .
+x >< y: rec x. ?bool.x .
+    x1 >< y1: lin?bool.lin!bool.end .
+        x2 >< y2: lin?bool.lin!bool.end .
+            { x1 << true . x1 >> n . y2 >> n . y2 << n .0
+            | y1 >> n . y1 << false . x2 << false . x2 >> n .0
+            }
