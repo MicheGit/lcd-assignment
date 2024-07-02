@@ -42,6 +42,85 @@
     \end{minted}
 \end{frame}
 
+\begin{frame}[fragile]{Basic Types - Context}
+    Contexts support the following operations:
+    \begin{itemize}
+        \item (nondeterministic) \textbf{context split} $\Gamma = \Gamma_1 \circ \Gamma_2$: the function \texttt{ndsplit :: Context -> [(Context, Context)]} creates all possible combinations of dividing \texttt{lin}ear variables, mantaining \texttt{un}restricted variables;
+        \item \textbf{update} $\Gamma + (x : T)$: the function \texttt{update k t} inserts $k : t$ in the context only if the variable $k$ was not present, or it was yet defined \texttt{un}restricted with type $t$;
+        \item \textbf{override} $\Gamma, (x : T)$: this represents newly bounded variables, possibly shadowing preexisting definitions.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Basic Types - Typing Rules (1)}
+
+    Sequent calculus rules are modeled as instnces of the context transition \textbf{monad}:
+
+    \begin{minted}{hs}
+newtype CT a = CT 
+    (Context -> TypeErrorBundle TypeError (a, Context))
+
+instance Monad CT where
+    return :: a -> CT a
+    (>>=) :: CT a -> (a -> CT b) -> CT b
+\end{minted}
+    Rules can be composed and propagate context side effects
+
+    A check rule can either hold and return \texttt{()} or fail and return an error:
+    \begin{minted}{hs}
+class TypeCheck a where
+    check :: a -> CT ()
+    \end{minted}
+
+\end{frame}
+
+\begin{frame}[fragile]{Basic Types - Typing Rules (2)}
+
+    \begin{exampleblock}{Unrestricted requirement}
+        $\texttt{un}(\Gamma)$ holds when all entries in the context are unrestricted:
+\vspace{0.5cm}
+        \begin{minted}{hs}
+unGamma :: CT ()
+unGamma = CT (\context -> if all unrestricted context
+    then Right ()
+    else Left "Error message...")  
+        \end{minted}
+    \end{exampleblock}
+\end{frame}
+
+\begin{frame}[fragile]{Basic Types - Typing Rules (3)}
+
+    \begin{exampleblock}{Context update}
+        $\Gamma + (x : T)$ throws an error if the conditions arent met:
+        \small\begin{minted}[escapeinside=//,mathescape=true]{hs}
+update :: String -> SpiType -> CT ()
+update k t = do
+    may <- liftPure (M.lookup k)
+    case may of
+        Just found -> unless (predicate Un t && found /$\approx$/ t) 
+            (throwError "Error message..")
+        Nothing    -> sideEffect (M.insert k t)
+        \end{minted}
+    \end{exampleblock}
+    
+\end{frame}
+
+
+\begin{frame}[fragile]{Basic Types - Typing Rules (4)}
+
+    \begin{exampleblock}{Context update}
+        Context transitions can even return useful values:
+        \small\begin{minted}{hs}
+extract :: String -> CT SpiType
+extract k = do
+    t <- get k
+    unless (predicate Un t) (delete k)
+    return t
+        \end{minted}
+    \end{exampleblock}
+
+    This is used to optimize some context splits in the [\textsc{T-Rec}] and [\textsc{T-Send}] rules
+
+\end{frame}
 
 % \begin{frame}{Language - Precomputation}
 %     After parsing, the program is precomputed lifting all bindings over all parallel compositions, as expressed in the following \textbf{structural congruence}: 
