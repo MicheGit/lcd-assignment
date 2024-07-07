@@ -61,7 +61,7 @@ newtype CT a = CT {unwrap :: Context -> TypeErrorBundle TypeError (a, Context)}
 
 -- A rule of the type \Gamma |- a
 --  where a = Proc | Claim
-class TypeCheck a where
+class NDTypeCheck a where
     check :: a -> CT ()
 
 -- Example: Un(\Gamma) represents the condition for which the context has only
@@ -86,7 +86,7 @@ throwError e = CT (\c -> do
 liftPure :: (Context -> a) -> CT a
 liftPure = liftC . (return .)
 
-instance TypeCheck Claim where
+instance NDTypeCheck Claim where
     check :: Claim -> CT ()
     -- Any literal value types boolean iff the context is unrestricted
     check (Lit _, Boolean) = gammaPred Un
@@ -118,6 +118,12 @@ sideEffect :: (Context -> Context) -> CT ()
 sideEffect f = CT (do
     c' <- f
     return (return ((), c')))
+
+deleteSet :: S.Set String -> Context -> Context
+deleteSet s = foldl (.) id (M.delete <$> S.toList s)
+
+contextDiff :: S.Set String -> CT ()
+contextDiff s = sideEffect (deleteSet s)
 
 -- Returns the current context as a result.
 ctId :: CT Context
@@ -195,7 +201,7 @@ detach :: [CT ()] -> CT ()
 detach cts = return () -< cts >- return ()
 
 
-instance TypeCheck Proc where
+instance NDTypeCheck Proc where
     check :: Proc -> CT ()
     -- The inaction process is well typed when the context has no linear variables
     check Nil = gammaPred Un
@@ -203,19 +209,18 @@ instance TypeCheck Proc where
     -- Note that it requires only one split to be successful, as not in the default multiple-premises behaviour.
     check (Par p1 p2) = do
         splits <- liftPure ndsplit
-        let cand c1 c2 = (return () -< [ c1 |> check p1, c2 |> check p2 ] <&> (`using` parList rdeepseq)) >- return ()
-        runs <- return () -< (uncurry cand <$> splits)
-        let results = runs -- `using` parList rdeepseq
+        runs <- return () -< (candidate <$> splits)
+        let results = runs `using` parList rdeepseq
             outcome = foldChoice results
             -- ppsplit = foldl (\acc split -> (printf "%s\n\t%s" acc (show split) :: String)) "No context split typed both processes. Errors were:\n"
         liftEither (mapLeft (const "No context split typed both processes.") outcome)
+        where
+            candidate (c1, c2) = (return () -< [ c1 |> check p1, c2 |> check p2 ] <&> (`using` parList rdeepseq)) >- return ()
     -- A bind is well typed iff the subprocess is well typed overriding the definitions of the bounded variables.
     check (Bnd (x, Just tx) (y, Just ty) p) = do
         override x tx
         override y ty
         check p
-    -- TODO type inferrer
-    --  Finite lattice Top > {ChannelType > {{Linear, Unrestricted}, {Sending, Receiving}} > \times, Bool} > Bottom
     check (Bnd {}) = throwError "Bind without type definitions untypable - type inference not implemented."
     -- A branch is well typed iff:
     --  - the guard is a boolean
@@ -246,7 +251,7 @@ instance TypeCheck Proc where
     --  and then the context has to:
     --  - type the value to send
     --  - type the remaining subprocess
-    -- If the value to send was to typecheck against an unrestricted type, then it is sufficient that
+    -- If the value to send was to NDTypeCheck against an unrestricted type, then it is sufficient that
     --  the unrestricted subcontext types such claim.
     -- Otherwise, it is sufficient to find (and removing) a matching claim in the context.
     check (Snd x v p) = do
@@ -263,8 +268,106 @@ instance TypeCheck Proc where
         check p
 
 -- To check whether a process is well typed it is sufficient to check it against the empty context.
-typeCheck :: Proc -> TypeErrorBundle TypeError ()
-typeCheck p = fst <$> unwrap (check p) M.empty
+ndtypeCheck :: Proc -> TypeErrorBundle TypeError ()
+ndtypeCheck p = fst <$> unwrap (check p) M.empty
+
+
+class TypeCheck a where
+    type Output a
+    dcheck :: a -> CT (Output a)
+
+instance TypeCheck Claim where
+    type Output Claim = ()
+    dcheck :: Claim -> CT ()
+    dcheck (Lit _, Boolean) = return ()
+    dcheck (Var x, t@(Qualified Lin _)) = do
+        found <- extract x
+        when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
+    dcheck (Var x, t) = do
+        found <- get x
+        when (found /= t) $ throwError (printf "Error checking claim: variable %s found in context with type %s which is different from %s required" x (show found) (show t))
+    dcheck c = throwError (printf "Tried to check %s, i.e. a literal with a channel type" (show c))
+
+foldRight :: [Either a b] -> Either a [b]
+foldRight [] = Right []
+foldRight (x:xs) = case x of 
+    Left l -> Left l
+    Right r -> case foldRight xs of
+        Left l -> Left l
+        Right rs -> Right (r:rs)
+
+evalIndependently :: [CT a] -> CT [(a, Context)]
+evalIndependently [] = return []
+evalIndependently cts = CT (\ctx -> do
+    let runs = ($ ctx) . unwrap <$> cts
+    results <- foldRight runs
+    return (results, ctx))
+
+allEqual :: Eq a => [a] -> Bool
+allEqual [] = True
+allEqual xs = foldl (\acc a -> acc && a == hd) True xs
+    where
+        hd = head xs
+
+
+instance TypeCheck Proc where
+    type Output Proc = S.Set String
+    dcheck :: Proc -> CT (S.Set String)
+    dcheck Nil = return S.empty
+    dcheck (Par p1 p2) = do
+        l <- dcheck p1
+        contextDiff l -- removes all used channels
+        dcheck p2
+    dcheck (Brn g p1 p2) = do
+        dcheck (g, Boolean)
+        ls <- evalIndependently
+            [ dcheck p1
+            , dcheck p2
+            ]
+        unless (allEqual ls) $ throwError (printf "Both branches of statements must yield the same results: %s \\= %s while checking %s" (show $ head ls) (show $ ls !! 1) (show $ Par p1 p2))
+        sideEffect $ const $ snd $ head ls
+        return (fst $ head ls)
+    dcheck (Snd x v p) = do
+        qtu <- extract x
+        (u, q, t) <- case behave qtu of
+            Just (u, Qualified q (Sending t _)) -> return (u, q, t)
+            b -> throwError (printf "Channel %s : %s does not behave like a sending channel, but rather as %s" x (show qtu) (show b))
+        dcheck (v, t)
+        update x u
+        l <- dcheck p
+        if q == Lin
+            then return (S.insert x l)
+            else return l
+    dcheck (Rec q1 x y p) = do
+        qtu <- extract x
+        (u, q2, t) <- case behave qtu of
+            Just (u, Qualified q2 (Receiving t _)) -> return (u, q2, t)
+            b -> throwError (printf "Channel %s : %s does not behave like a receiving channel, but rather as %s" x (show qtu) (show b))
+        override y t
+        update x u
+        l <- dcheck p
+        when (q1 == Un && (l /= S.empty)) $ throwError (printf "There should be no linear variable in suprocess %s since it is included in a replicated environment" (show p)) 
+        delete y
+        let l' = S.delete y l
+        return (if q2 == Lin
+            then S.insert x l'
+            else l')
+    dcheck (Bnd (x, Just tx) (y, Just ty) p) = do
+        override x tx
+        override y ty
+        l <- dcheck p
+        delete x
+        delete y
+        return (S.delete x $ S.delete y l)
+    dcheck (Bnd {}) = throwError "Bind without type definitions untypable - type inference not implemented."
+
+typeCheck :: Proc -> TypeErrorBundle TypeError ()  
+typeCheck p = fst <$> unwrap doCheck M.empty
+    where
+        doCheck :: CT ()
+        doCheck = do
+            _ <- dcheck p
+            gammaPred Un
 
 -- Utilities
 

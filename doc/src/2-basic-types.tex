@@ -81,7 +81,7 @@ class TypeCheck a where
         \begin{minted}{hs}
 unGamma :: CT ()
 unGamma = CT (\context -> if all unrestricted context
-    then Right ()
+    then Right ((), context)
     else Left "Error message...")  
         \end{minted}
     \end{exampleblock}
@@ -122,98 +122,150 @@ extract k = do
 
 \end{frame}
 
-% \begin{frame}{Language - Precomputation}
-%     After parsing, the program is precomputed lifting all bindings over all parallel compositions, as expressed in the following \textbf{structural congruence}: 
-%     \[ (\nu x y) P | Q \equiv (\nu x y) (P | Q) \]
-% \end{frame}
+\begin{frame}{Basic Types - Typing Rules (5)}
+    Context split require to nondeterministically check over all possible split if there is one that satisfies the rule.
 
-% \begin{frame}[fragile]{Language - Operational Semantics}
-%     The code interpreter prints debug information about the program executed, along with a timestamp and a description of what the process did at that time.
+    \vspace{1cm}
 
-%     \begin{block}{Output format}
-%         \begin{lstlisting}
-% [TIMESTAMP | ThreadId THREAD_ID]: MESSAGE
-%         \end{lstlisting}
-%     \end{block}
+    Chapter 8 ``Algorithmic type checking'' shows a set of equivalent rules that can be checked with a deterministic algorithm.
+\end{frame}
+\begin{frame}{Basic Types - Typing Rules (6)}
+    \begin{exampleblock}{Example: \textsc{T-In}}
+        \begin{flalign*}
+            \begin{prooftree}
+                \hypo{\Gamma_1 \vdash x : q?T.U}
+                \hypo{(\Gamma_2 + x : U), y : T \vdash P}
+                \infer2[[\textsc{T-In}]]{\Gamma_1 \circ \Gamma_2 \vdash x(y).P}
+            \end{prooftree}
+        \end{flalign*}
+    \end{exampleblock}
+    In this case the rule holds following those observations:
+    \begin{itemize}
+        \item if $x$ is not present in $\Gamma_1 \circ \Gamma_2$ the left assumption can never be verified;
+        \item if $\Gamma_1 \circ \Gamma_2$ contains the claim $x : \texttt{un} T.U$, then both $\Gamma_1,\Gamma_2$ contain such claim;
+        \item if $\Gamma_1 \circ \Gamma_2$ contains the claim $x : \texttt{lin} T.U$, then $\Gamma_1$ must contain that claim and $\Gamma_2$ must not.
+    \end{itemize}
+\end{frame}
 
-%     Program behaviour is defined according to the \textbf{operational semantics} presented in chapter 2.
-% \end{frame}
-
-% \subsection{Runtime}
-
-% \begin{frame}{Runtime - Concurrent Haskell}
-
-%     The language runtime is implemented in concurrent Haskell, using:
-%     \begin{itemize}
-%         \item the \texttt{IO} monad, along with a local state that maps variables to channels and literals, to model threads;
-%         \item and the \texttt{MVar} type to model channels.
-%     \end{itemize}
-
-%     Each thread is created with the \[ \texttt{forkIO :: IO () -> IO ThreadId} \] function, that simply creates a new thread, returning its id. % NO default AWAIT
+\begin{frame}{Basic Types - Typing Rules (7)}
+    Notice that in order to type $\Gamma_1 \vdash x : q?T.U$, as for the rule [\textsc{T-Var}], $\Gamma_1$ must not contain any linear claim.
     
-% \end{frame}
+    \vspace{1cm}
 
-% \begin{frame}{Runtime - Channels (1/2)}
-%     Plain \texttt{MVar}s can await for value insertion with the function \[ \texttt{takeMVar :: MVar a -> IO a} \] but the dual operation \[ \texttt{putMVar :: MVar a -> a -> IO ()} \] does not await the variable to be ready to accept a new value.
-% \end{frame}
+    Hence, $\Gamma_2$ must contain all linear claims in $\Gamma_1 \circ \Gamma_2$, of course except for $x$ if it was linear.
+\end{frame}
 
+\begin{frame}[fragile]{Basic Types - Typing Rules (8)}
+    Hence the algorithm for this rule is presented as follows:
+    \begin{exampleblock}{Example: \textsc{T-In}}
+        \begin{minted}{hs}
+check (Rec x y p) = do
+    xType <- extract x -- If not present, the monadic
+        -- bind will make the whole rule fail.
+        -- The function extract will preserve
+        -- 
+    (t, u) = case xType of 
+            Qualified _ (Receiving t u) -> 
+                return (t, u)
+            _ -> throwError "..."
+    update x u
+    replace y t
+    check p
+        \end{minted}
+    \end{exampleblock}
+\end{frame}
 
-% \begin{frame}{Runtime - Channels (2/2)}
-%     Channels are represented as tuples of \texttt{MVar}, meaning \texttt{(value, idle)}:
-%     \begin{itemize}
-%         \item \texttt{value :: MVar }$v$, containing the passed value, which needs to be evaluated;
-%         \item \texttt{idle :: MVar ()}, which has a \texttt{()} value in it when the channel is ready to receive.
-%     \end{itemize}
-%     Then, the \texttt{Channel} datatype further distinguishes whether it is a read end or a write end. Read ends and write ends share the same \texttt{MVar}s.
-% \end{frame}
+\begin{frame}{Basic Types - Fir}
+    Other typing rules implementations follow similar reasoning.
 
-% \begin{frame}{Runtime - Program Behaviour (1/3)}
-%     \begin{block}{Inaction}
-%         The process $0$ just prints \texttt{STOP} and ends the thread.
-%     \end{block}
+    \vspace{0.5cm}
 
-%     \begin{block}{Branching}
-%         The process $\texttt{if }v\texttt{ then }P_1\texttt{ else }P_2$ prints two debug messages, both starting with \texttt{BRANCHING}:
-%         \begin{itemize}
-%             \item the guard before evaluation;
-%             \item and then, after evaluation in the local state.
-%         \end{itemize}
-%         After that, the run continues as the appropriate process.
-%     \end{block}
-% \end{frame}
+    One could think of an intuitive way to parallelize the [\textsc{T-Par}]:
 
-% \begin{frame}{Runtime - Program Behaviour (2/3)}
-%     \begin{block}{Binding}
-%         The process $(\nu x y) . P$ just prints \texttt{BINDING} followed by the two bounded variables. Then, it creates two \texttt{MVar}s, one for the value and one for the lock and associates in the local state both variables with the respective ends.
+    \begin{exampleblock}{[\textsc{T-Par}]}
+        \begin{flalign*}
+            \begin{prooftree}
+                \hypo{\Gamma_1 \vdash P_1}
+                \hypo{\Gamma_2 \vdash P_2}
+                \infer2[[\textsc{T-Par}]]{\Gamma_1 \circ \Gamma_2 \vdash P_1 | P_2} 
+            \end{prooftree}
+        \end{flalign*}
+    \end{exampleblock}
 
-%         The run proceeds in the same thread as prescribed by $P$.
-%     \end{block}
+\end{frame}
 
-%     \begin{block}{Fork}
-%         The process $P_1 | P_2$ prints \texttt{FORK} followed by the two new processes ids.
+\begin{frame}[fragile]{Algorithmic Type Checking - First attempt (2)}
+    The algorithm checks all possible splits of $\Gamma_1 \circ \Gamma_2$
+    \small\begin{minted}{hs}
+check (Par p1 p2) = do
+    splits <- liftPure ndsplit 
+    -- Compute all possible splits
+    runs <- return () -< (candidate <$> splits)
+    liftEither $ foldChoice runs 
+        {- `using` parList rdeepseq -}
+    where
+        candidate (c1, c2) = (return () -< 
+            [ c1 |> check p1
+            , c2 |> check p2 
+            ] {- <&> (`using` parList rdeepseq) -} 
+            ) >- return ()
+    \end{minted}
+    It seems natural to desire to parallelize this code in the points with comments...
+\end{frame}
 
-%         To prevent a concurrent program to end before all forked threads terminate, this code constructs two \texttt{MVar}s that are notified when the two new threads finish. This process doesn't do anything more than awaiting for both threads to finish.
-%     \end{block}
-% \end{frame}
+\begin{frame}[fragile]{Basic Types - Typing Rules (11)}
+    
+    ... but this would imply loss in performance. Consider the following program:
+    \begin{exampleblock}{Example: \texttt{assets/well-formed-ill-typed/multiple.spi}}
+\tiny\begin{lstlisting}{language=pilang}
+a1 >< a2: lin?bool.end .
+b1 >< b2: lin?bool.end .
+c1 >< c2: lin?bool.end .
+d1 >< d2: lin?bool.end .
+e1 >< e2: lin?bool.end .
+f1 >< f2: lin?bool.end .
+x >< y: rec x. ?bool.x .
+    x1 >< y1: lin?bool.lin!bool.end .
+        x2 >< y2: lin?bool.lin!bool.end .
+            { x << true . y >> z . if z then 0 else 0
+            | y >> z . if z
+                then x << false . 0
+                else 0
+            | x1 << true . x1 >> n . y2 >> n . y2 << n .0
+            | y1 >> n . y1 << false . x2 << false . x2 >> n .0
+            | a1 << true . b1 << true . c1 << true 
+                . d1 << true . e1 << true . f1 << true . 0
+            | a2 >> e . b2 >> e . c2 >> e . d2 >> e . e2 >> e . 
+                0
+            }
+        \end{lstlisting}
+    \end{exampleblock}
+\end{frame}
 
-% \begin{frame}{Runtime - Program Behaviour (3/3)}
-%     \begin{block}{Sending}
-%         The process $\overline{x} v . P$ prints \texttt{SENDING} followed by the value: 
-%         \begin{itemize}
-%             \item before evaluation;
-%             \item and after evaluation.
-%         \end{itemize}
+\begin{frame}{}
+    Running the program 
+    \begin{minipage}{0.45\textwidth}
+        \small\texttt{SPARKS: 651264 (0 converted, 58321 overflowed, 0 dud, 429960 GC'd, 15527 fizzled)}
         
-%         Then the process sends the value over the channel $x$ and proceeds as prescribed by P.
-%     \end{block}
-
-%     \begin{block}{Receiving}
-%         The process $x(v) . P$ prints \texttt{RECEIVING} followed by: 
-%         \begin{itemize}
-%             \item the newly bound variable name;
-%             \item and the value received.
-%         \end{itemize}
+        \small\begin{tabular}{cccc}
+            INIT    & time &    0.001s &  (  0.001s elapsed) \\
+            MUT     & time &    2.987s &  (  2.981s elapsed) \\
+            GC      & time &    3.961s &  (  3.972s elapsed) \\
+            EXIT    & time &    0.000s &  (  0.007s elapsed) \\
+            Total   & time &    6.949s &  (  6.961s elapsed)
+        \end{tabular}
         
-%         Then the process proceeds as prescribed by P.
-%     \end{block}
-% \end{frame}
+      
+    \end{minipage}
+    \begin{minipage}{0.45\textwidth}
+        SPARKS: 3540338 (98151 converted, 87210 overflowed, 0 dud, 2443757 GC'd, 632692 fizzled)
+      
+        INIT    time    0.002s  (  0.002s elapsed)
+        MUT     time   23.487s  (  6.104s elapsed)
+        GC      time   29.159s  (  9.701s elapsed)
+        EXIT    time    0.071s  (  0.004s elapsed)
+        Total   time   52.720s  ( 15.811s elapsed)
+      
+    \end{minipage}
+
+\end{frame}
