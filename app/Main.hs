@@ -5,7 +5,7 @@ import Control.Exception (throw)
 import Data.List (intercalate)
 
 import SessionPi.Syntax (Proc)
-import SessionPi.Types (typeCheck)
+import SessionPi.Types (typeCheck, ndtypeCheck)
 import SessionPi.Runtime (run)
 import SessionPi.Parser (parseProcess)
 import SessionPi.Preprocessing (preprocess)
@@ -16,14 +16,16 @@ main = getParsedProgram >>= run
 getParsedProgram :: IO Proc
 getParsedProgram = do
     args <- getArgs
-    filename <- case args of
-            [filename] -> return filename
+    (nd, filename) <- case args of
+            [filename] -> return (False, filename)
+            ["nd", filename] -> return (True, filename)
             _ -> do
                 print "Missing filename from command line arguments."
                 print "Usage: stack run -- path/to/file.spi"
                 throw $ userError "Expected Argument Error"
     filecontent <- readFile filename
     let result = parseProcess filename filecontent
+        checkFn = if nd then ndtypeCheck else typeCheck
     case result of
         Right raw -> do
             let processed = preprocess raw
@@ -32,7 +34,7 @@ getParsedProgram = do
                     print "Could not infer type for input program"
                     throw $ userError (intercalate "\n\t-" err)
                 Right program ->
-                    case typeCheck program of
+                    case checkFn program of
                         Right () -> do
                             print "Typecheck successful!"
                             return program

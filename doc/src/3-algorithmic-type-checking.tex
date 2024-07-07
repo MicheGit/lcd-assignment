@@ -1,0 +1,60 @@
+\section{Algorithmic Type Checking}
+
+\begin{frame}{Algorithmic Type Checking (1)}
+    The problem with the parallel composition rule is that a linear channel cannot be in both contexts
+
+    \vspace{0.5cm}
+
+    However, this problem can be easily overcame by keeping track of \textbf{variables} used in \textbf{subject position}, such as channel send or receive.
+
+    \vspace{0.5cm}
+
+    For processes, output context $\Gamma_2$ contains all free variables ``consumed'' by process $P$, $L$ contains all linear free variable used in process $P$
+    \begin{flalign*}
+        & & \Gamma_1 \vdash P : \Gamma_2 ; L & & \Gamma_1 \vdash x : T ; \Gamma_2 & &
+    \end{flalign*}
+
+    For variables, the output is a context without the variable, if it was linear
+
+\end{frame}
+
+\begin{frame}[fragile]{Algorithmic Type Checking (2)}
+
+    Then \textbf{context difference} $\Gamma \div L$ removes all variables in $L$ from $\Gamma$ and yields an error if there was a linear variable in $L$.
+
+    \vspace{0.5cm}
+
+    Then, parallel composition rule is easily defined:
+    \begin{flalign*}
+        \begin{prooftree}
+            \hypo{\Gamma_1 \vdash P : \Gamma_2 ; L_1}
+            \hypo{\Gamma_2 \div L_1 \vdash Q : \Gamma_3 ; L_2}
+            \infer2[[\textsc{A-Par}]]{\Gamma_1 \vdash P | Q : \Gamma_3 ; L_2}
+        \end{prooftree}
+    \end{flalign*}
+    The implementation is straight forward:
+    \begin{minted}{hs}
+        check (Par p1 p2) = do
+            l1 <- check p1
+            contextDiff l1
+            check p2
+    \end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Algorithmic Type Checking (3)}
+    
+    Other rules have similar implementation. The optimizations for direct context split check of [\textsc{T-In}] and [\textsc{T-Out}] are related.
+
+    \vspace{0.5cm}
+
+    Rule [\textsc{A-If}] requires that the outputs for both branches are the same:
+    \begin{flalign*}
+        \begin{prooftree}
+            \hypo{\Gamma_1 \vdash v : q \text{ bool} ; \Gamma_2}
+            \hypo{\Gamma_2 \vdash P : \Gamma_3 ; L}
+            \hypo{\Gamma_2 \vdash Q : \Gamma_3 ; L}
+            \infer3[[\textsc{A-If}]]{\Gamma_1 \vdash \text{if }v\text{ then }P\text{ else }Q: \Gamma_3 ; L}
+        \end{prooftree}
+    \end{flalign*} 
+
+\end{frame}

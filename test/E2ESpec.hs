@@ -1,7 +1,7 @@
 module E2ESpec (spec) where
 import Test.Hspec (Spec, describe, it, shouldSatisfy, shouldBe)
 import SessionPi.Parser (parseProcess)
-import SessionPi.Types (typeCheck, TypeCheck (check), CT (unwrap))
+import SessionPi.Types (typeCheck, doCheck, CT (unwrap))
 import SessionPi.Preprocessing (preprocess)
 import Data.Either ( isLeft, isRight )
 import qualified SessionPi.Types as T
@@ -85,7 +85,7 @@ spec = do
 
         it "accepts a loop typed variable" $ do
             let process = fromRight' $ parseProcess "test" "x2 >> z . z << true.0 | x2 >> w . w << false.0"
-                chk = T.unwrap (T.check process) (M.singleton "x2" (Recursive "x"
+                chk = T.unwrap (T.doCheck process) (M.singleton "x2" (Recursive "x"
                     (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x")))))
             chk `shouldSatisfy` isRight
 
@@ -151,7 +151,7 @@ spec = do
             parsed `shouldSatisfy` isRight
             let tx2 = Recursive "x" (Qualified Un (Receiving Boolean (TypeVar "x")))
                 tx1 = Recursive "x" (Qualified Un (Sending Boolean (TypeVar "x")))
-                chk = unwrap (check $ fromRight' parsed) $ M.fromList
+                chk = unwrap (doCheck $ fromRight' parsed) $ M.fromList
                     [ ("x2", tx2)
                     , ("x1", tx1)
                     , ("c", Qualified Lin (Sending Boolean End))
@@ -161,5 +161,5 @@ spec = do
         it "accepts replication when passing channel instead" $ do
             let parsed = preprocess $ fromRight' $ parseProcess "test" "un x2 >> z . z << true .0 "
             parsed `shouldSatisfy` isRight
-            let chk = unwrap (check $ fromRight' parsed) $ M.singleton "x2" (Recursive "x" (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x"))))
+            let chk = unwrap (doCheck $ fromRight' parsed) $ M.singleton "x2" (Recursive "x" (Qualified Un (Receiving (Qualified Lin (Sending Boolean End)) (TypeVar "x"))))
             chk `shouldSatisfy` isRight
