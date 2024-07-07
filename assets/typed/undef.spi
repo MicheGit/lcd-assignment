@@ -1,2 +1,0 @@
--- Shouldn't type as x3 is undefined
-x1 >< x2: lin? bool.end . x1 << true . 0 | x3 >> y. 0
