@@ -1,0 +1,161 @@
+\section{Other features}
+
+\begin{frame}{Other features}
+
+    Other features include:
+    \begin{itemize}
+        \item \textbf{recursive types} (described in section 4);
+        \item \textbf{tuple syntax} (described in section 4);
+        \item \textbf{replicated behaviours} (described in section 5);
+        \item \textbf{branching and selection} (described in sectin 6 but not implemented).
+    \end{itemize}
+
+\end{frame}
+
+\subsection{Recursive Types}
+
+\begin{frame}{Recursive Types (1/4)}
+
+    Context update doesn't allow [\textsc{T-In}] and [\textsc{T-Out}] rules (and algorithmic respectives) to type any unbounded type:
+
+    \begin{block}{Rule \textsc{T-In}}
+        \begin{flalign*}
+            \begin{prooftree}
+                \hypo{\Gamma_1 \vdash x : q?T.U}
+                \hypo{(\Gamma_2 + x : U), y : T \vdash P}
+                \infer2[[\textsc{T-In}]]{\Gamma_1 \circ \Gamma_2 \vdash x(y).P}
+            \end{prooftree}
+        \end{flalign*}
+    \end{block}
+    
+    Tt requires the $U$ type to be the same as $\text{un}?T.U$. Same holds for [\textsc{T-Out}]
+
+\end{frame}
+
+\begin{frame}{Recursive Types (2/4)}
+    To overcome this, we would like to consider the solution of an equation like
+    \[ x = \text{un}?T.x \]
+
+    In order to do this, the paper introduces two new syntax constructs:
+    \begin{itemize}
+        \item \textbf{type variables};
+        \item a type-level binder $\mu$ that define types as \textbf{infinite regular trees}.
+    \end{itemize}
+
+    This is due to the fact that we need a way to determine type equality which not syntactic congruence
+\end{frame}
+
+\begin{frame}[fragile]{Recursive Types (3/4)}
+    The paper omits the co-inductive defintion, the code implements this equivalence as a \textbf{bisimulation}
+
+    \scriptsize\begin{minted}[escapeinside=//,mathescape=true]{hs}
+class (Eq a, Ord a) => Bisimulation a where
+    behave :: a -> (a, a)
+
+bisim :: (Bisimulation a) => S.Set (a, a) -> a -> a -> Bool
+bisim _   a b | a == b = True
+bisim rel a b | S.member (a, b) rel = True
+bisim rel a b | S.member (b, a) rel = True
+bisim rel a b =
+    let (a', oa) = behave a
+        (b', ob) = behave b
+    in (oa == ob && bisim (S.insert (a, b) rel) a' b')
+
+(/$\approx$/) :: (Bisimulation a) => a -> a -> Bool
+(/$\approx$/) = bisim S.empty
+    \end{minted}
+    
+\end{frame}
+
+\begin{frame}[fragile]{Recursive Types (4/4)}
+    Recursive types $\mu a.T$ implement the \texttt{behave} function required, as specified in the paper, to never consider the type as it is but another type in the same equivalence class, namely $T[\mu a.T/a]$
+
+    \footnotesize\begin{minted}{hs}   
+instance Bisimulation SpiType where
+    behave :: SpiType -> (SpiType, SpiType)
+    behave (Qualified q (Sending v t)) = 
+        (t, Qualified q (Sending v End))
+    behave (Qualified q (Receiving v t)) = 
+        (t, Qualified q (Receiving v End))
+    behave t@(Recursive x t') = behave (subsType x t t')
+    behave t = (t, t)
+    \end{minted}
+
+    Other types resort to syntactic equivalence
+\end{frame}
+
+\subsection{Tuple Syntax}
+
+\begin{frame}{Tuple Syntax}
+    The paper presents a syntactic sugar for tuple passing:
+    \begin{flalign*}
+        \overline{x_1} \langle u, v \rangle . P \text{ abbreviates } & (\nu y_1 y_2) \overline{x_1} y_2 . \overline{y_1} u . \overline{y_1} v . P \\
+        x_2(w, t) . P \text{ abbreviates } & x_2(z) . z(w) . z(t) . P
+    \end{flalign*}
+
+    Hidden channels $y_1, y_2$ need to be typed. There are two ways to achieve this:
+    \begin{itemize}
+        \item type annotation on the binding $(\nu x_1 x_2)$ (long and tedious);
+        \item type inference (not described in the paper, hence details omitted).
+    \end{itemize}
+\end{frame}
+
+\subsection{Replicated Behaviour}
+
+\begin{frame}{Replicated Behaviour (1)}
+    Section 5 modifies process syntax annotating receiving channels with \texttt{lin} and \texttt{un} modifiers:
+    \begin{itemize}
+        \item if a channel is annotated with \texttt{lin} then it is consumed;
+        \item if a channel is annotated with \texttt{un} then it is replicated.
+    \end{itemize}
+
+    Reduction rules (and runtime implementation) are updated accordingly:
+    \begin{flalign*}
+        (\nu x y) \overline{x} v . P | \text{lin} y(z).Q \to (\nu x y) P | Q[v/z] && [\textsc{R-LinCom}] \\
+        (\nu x y) \overline{x} v . P | \text{un} y(z).Q \to (\nu x y) (P | Q[v/z] | \text{un} y(z).Q )&& [\textsc{R-UnCom}] 
+    \end{flalign*}
+
+    (In practice, only the \texttt{un} modifier is introduced)
+
+\end{frame}
+
+\begin{frame}{Replicated Behaviour (2)}
+    Types are updated following a third invariant:
+    \begin{description}
+        \item[inv. (iii)] Unrestricted input processes may not contain free linear variables.
+    \end{description}
+
+    That implies:
+    \begin{itemize}
+        \item there is no replication of linear variables, mantaining their transient behaviour;
+        \item there could be \emph{bounded} linear variables.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Replicated Behaviour (3)}
+    Hence the new rules for receiving channels are:
+    \begin{block}{Rule \textsc{T-In}}
+        \begin{flalign*}
+            \begin{prooftree}
+                \hypo{\Gamma_1 \vdash x : q?T.U}
+                \hypo{(\Gamma_2 + x : U), y : T \vdash P}
+                \infer2[[\textsc{T-In}]]{\Gamma_1 \circ \Gamma_2 \vdash x(y).P}
+            \end{prooftree}
+        \end{flalign*}
+    \end{block}
+
+    \begin{block}{Rule \textsc{A-In}}
+        \small\begin{flalign*}
+            \begin{prooftree}
+                \hypo{
+                    \begin{tabular}{l}
+                        $\Gamma_1 \vdash x : q_2 ? T.U ; \Gamma_2$ \\
+                        $(\Gamma_2, y : T) + x : U \vdash P : \Gamma_3 ; L$
+                    \end{tabular}
+                }
+                \hypo{q_1 = \text{un} \implies L {\color{red} \setminus \{ y \}} = \emptyset}
+                \infer2[[\textsc{A-In}]]{\Gamma_1 \vdash q_1 x(y).P : \Gamma_3 \div \{ y \} ; L \setminus \{ y \} \cup (\text{if }q_2 = \text{lin}\text{ then }\{ x \}\text{ else }\emptyset)}
+            \end{prooftree}
+        \end{flalign*}
+    \end{block}
+\end{frame}

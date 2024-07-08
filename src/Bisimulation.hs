@@ -9,17 +9,17 @@ class (Eq a, Ord a) => Bisimulation a where
     --  and the second is the observed behaviour.
     -- Although the behaviour might be of any nature, here we just need 
     --  that it's in an appropriate equivalence class for the object itself.
-    behave :: a -> Maybe (a, a)
-    behave a = Just (a, a)
+    behave :: a -> (a, a)
+    behave a = (a, a)
 
 bisim :: (Bisimulation a) => S.Set (a, a) -> a -> a -> Bool
 bisim _   a b | a == b = True
 bisim rel a b | S.member (a, b) rel = True
 bisim rel a b | S.member (b, a) rel = True
-bisim rel a b = fromMaybe False $ do
-    (a', oa) <- behave a
-    (b', ob) <- behave b
-    return (oa == ob && bisim (S.insert (a, b) rel) a' b')
+bisim rel a b =
+    let (a', oa) = behave a
+        (b', ob) = behave b
+    in (oa == ob && bisim (S.insert (a, b) rel) a' b')
 
 
 (~) :: (Bisimulation a) => a -> a -> Bool

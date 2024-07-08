@@ -4,7 +4,7 @@
 
 \begin{frame}{Basic Types - Syntax}
     % TODO split in due colonne, riportare in una quella originale di vasconcelos e nell'altra quella implementata
-    Implementation of qualifier, pretypes and types are fully compliant to Chapter 3's original syntax:
+    Implementation of qualifier, pretypes and types are fully compliant to section 3's original syntax:
     \begin{minipage}{\textwidth}
         \begin{minipage}{0.45\textwidth}
             \begin{flalign*}
@@ -131,7 +131,7 @@ extract k = do
             \item naive approach, requires to check for all possible context splits for parallel composition (other rules are optimizable);
             \item can be done without using the \texttt{Output} of the algorithm;
         \end{itemize}
-        \item the rules presented in chapter 8 (Algorithmic Type Checking):
+        \item the rules presented in section 8 (Algorithmic Type Checking):
         \begin{itemize}
             \item more efficient, doesn't rely on context split;
             \item requires to track all used variables along the program and return them as output.
@@ -139,7 +139,7 @@ extract k = do
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Basic Types - Context Split (1)}
+\begin{frame}{Basic Types - Context Split (1/7)}
 
     Context split rules are modelled as \texttt{CT ()}, i.e. transitions that yield no output.
 
@@ -159,7 +159,7 @@ extract k = do
 
 \end{frame}
 
-\begin{frame}[fragile]{Basic Types - Context Split (2)}
+\begin{frame}[fragile]{Basic Types - Context Split (2/7)}
     The algorithm checks all possible splits of $\Gamma_1 \circ \Gamma_2$
     \small\begin{minted}{hs}
 check (Par p1 p2) = do
@@ -178,7 +178,7 @@ check (Par p1 p2) = do
     It seems natural to desire to parallelize this code in the points with comments...
 \end{frame}
 
-\begin{frame}[fragile]{Basic Types - Context Split (3)}
+\begin{frame}[fragile]{Basic Types - Context Split (3/7)}
     
     ... but this would imply loss in performance. Consider the following program:
     \begin{exampleblock}{Example: \texttt{assets/well-formed-ill-typed/multiple.spi}}
@@ -207,7 +207,7 @@ x >< y: rec x. ?bool.x .
     \end{exampleblock}
 \end{frame}
 
-\begin{frame}{Basic Types - Context Split (4)}
+\begin{frame}{Basic Types - Context Split (4/7)}
     Running this program with one CPU, it takes roughly 7 seconds to terminate.
     \vspace{0.5cm}
 
@@ -218,7 +218,7 @@ x >< y: rec x. ?bool.x .
     Other rules are optimizied to not resort to context split.
 \end{frame}
 
-\begin{frame}{Basic Types - Context Split (5)}
+\begin{frame}{Basic Types - Context Split (5/7)}
     \begin{exampleblock}{Example: \textsc{T-In}}
         \begin{flalign*}
             \begin{prooftree}
@@ -236,7 +236,7 @@ x >< y: rec x. ?bool.x .
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Basic Types - Context Split (6)}
+\begin{frame}{Basic Types - Context Split (6/7)}
     Notice that in order to type $\Gamma_1 \vdash x : q?T.U$, as for the rule [\textsc{T-Var}], $\Gamma_1$ must not contain any linear claim.
     
     \vspace{1cm}
@@ -244,7 +244,7 @@ x >< y: rec x. ?bool.x .
     Hence, $\Gamma_2$ must contain all linear claims in $\Gamma_1 \circ \Gamma_2$, of course except for $x$ if it was linear.
 \end{frame}
 
-\begin{frame}[fragile]{Basic Types - Context Split (6)}
+\begin{frame}[fragile]{Basic Types - Context Split (7/7)}
     Hence the algorithm for this rule is as follows:
     \begin{exampleblock}{Example: \textsc{T-In}}
         \begin{minted}{hs}

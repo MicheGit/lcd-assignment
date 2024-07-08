@@ -127,7 +127,7 @@ instance NDTypeCheck Proc where
         gammaPred q1 <|> throwError "Failed to type process: there are linear channels in replicated environment"
         t <- extract x
         (v, u) <- case behave t of
-            Just (u, Qualified q2 (Receiving v _)) -> do
+            (u, Qualified q2 (Receiving v _)) -> do
                 when (q1 == Un && q2 /= Un) $ throwError (printf "Failed to type replicating channel %s against linear type %s" x (show t))
                 return (v, u)
             b -> throwError (printf "Channel %s : %s does not behave like a receiving channel, but rather as %s" x (show t) (show b))
@@ -144,7 +144,7 @@ instance NDTypeCheck Proc where
     ndcheck (Snd x v p) = do
         t <- extract x
         (a, u) <- case behave t of
-            Just (u, Qualified _ (Sending a _)) -> return (a, u)
+            (u, Qualified _ (Sending a _)) -> return (a, u)
             b -> throwError (printf "Channel %s : %s does not behave like a sending channel, but rather as %s" x (show t) (show b))
         case (v, a) of
                 (Var y, Qualified Lin _) -> do
@@ -196,7 +196,7 @@ instance TypeCheck Proc where
     check (Snd x v p) = do
         qtu <- extract x
         (u, q, t) <- case behave qtu of
-            Just (u, Qualified q (Sending t _)) -> return (u, q, t)
+            (u, Qualified q (Sending t _)) -> return (u, q, t)
             b -> throwError (printf "Channel %s : %s does not behave like a sending channel, but rather as %s" x (show qtu) (show b))
         check (v, t)
         update x u
@@ -207,7 +207,7 @@ instance TypeCheck Proc where
     check (Rec q1 x y p) = do
         qtu <- extract x
         (u, q2, t) <- case behave qtu of
-            Just (u, Qualified q2 (Receiving t _)) -> return (u, q2, t)
+            (u, Qualified q2 (Receiving t _)) -> return (u, q2, t)
             b -> throwError (printf "Channel %s : %s does not behave like a receiving channel, but rather as %s" x (show qtu) (show b))
         override y t
         update x u
