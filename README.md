@@ -1,5 +1,13 @@
 # lcd-assignment
 
-## to see statistics
-stack build
-stack exec lcd-assignment-exe -- +RTS -s -RTS assets/typed/multiple-branching.spi 
+An overview of the implementation can be found in doc/presentazione.pdf
+
+## Run
+
+Requires stack
+
+The following command will build the project and run the type checker and interpreter.
+
+```sh
+stack run -- path/to/program.spi
+```
