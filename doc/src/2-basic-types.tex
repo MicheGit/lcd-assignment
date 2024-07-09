@@ -27,6 +27,25 @@
     Contexts are implemented as hash maps of types
 \end{frame}
 
+\begin{frame}{Basic Types - Invariants}
+
+    The type system has two main goals, expressed as invariants:
+    \begin{description}
+        \item[inv. (i)] References to linear channel ends occur in exactly one thread;
+        \item[inv. (ii)] Co-variables have dual types.
+    \end{description}
+    
+\end{frame}
+
+\begin{frame}[fragile]{Basic Types - Context}
+    Contexts support the following operations:
+    \begin{itemize}
+        \item (nondeterministic) \textbf{context split} $\Gamma = \Gamma_1 \circ \Gamma_2$: the function \texttt{ndsplit :: Context -> [(Context, Context)]} creates all possible combinations of dividing \texttt{lin}ear variables, mantaining \texttt{un}restricted variables;
+        \item \textbf{update} $\Gamma + (x : T)$: the function \texttt{update k t} inserts $k : t$ in the context only if the variable $k$ was not present, or it was yet defined \texttt{un}restricted with type $t$;
+        \item \textbf{override} $\Gamma, (x : T)$: this represents newly bounded variables, possibly shadowing preexisting definitions.
+    \end{itemize}
+\end{frame}
+
 \begin{frame}[fragile]{Basic Types - Duality}
     Duality is partially defined as follows:
     \begin{minted}{hs}
@@ -40,15 +59,6 @@
     dualType (Recursive a p) = Recursive a (dualType p)
     dualType (TypeVar x) = TypeVar 
     \end{minted}
-\end{frame}
-
-\begin{frame}[fragile]{Basic Types - Context}
-    Contexts support the following operations:
-    \begin{itemize}
-        \item (nondeterministic) \textbf{context split} $\Gamma = \Gamma_1 \circ \Gamma_2$: the function \texttt{ndsplit :: Context -> [(Context, Context)]} creates all possible combinations of dividing \texttt{lin}ear variables, mantaining \texttt{un}restricted variables;
-        \item \textbf{update} $\Gamma + (x : T)$: the function \texttt{update k t} inserts $k : t$ in the context only if the variable $k$ was not present, or it was yet defined \texttt{un}restricted with type $t$;
-        \item \textbf{override} $\Gamma, (x : T)$: this represents newly bounded variables, possibly shadowing preexisting definitions.
-    \end{itemize}
 \end{frame}
 
 \begin{frame}[fragile]{Basic Types - Typing Rules}
