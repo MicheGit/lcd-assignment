@@ -28,12 +28,12 @@
         \end{flalign*}
     \end{block}
     
-    Tt requires the $U$ type to be the same as $\text{un}?T.U$. Same holds for [\textsc{T-Out}]
+    Tt requires the $U$ type to be the same as $\text{un}?T.U$. Same holds for [\textsc{T-Out}].
 
 \end{frame}
 
-\begin{frame}{Recursive Types (2/4)}
-    To overcome this, we would like to consider the solution of an equation like
+\begin{frame}[fragile]{Recursive Types (2/4)}
+    We would like to consider the solution of an equation like
     \[ x = \text{un}?T.x \]
 
     In order to do this, the paper introduces two new syntax constructs:
@@ -42,7 +42,16 @@
         \item a type-level binder $\mu$ that define types as \textbf{infinite regular trees}.
     \end{itemize}
 
-    This is due to the fact that we need a way to determine type equality which not syntactic congruence
+    For example, a type that sends a boolean type all over can be described just as follows:
+
+    \begin{minipage}{0.45\textwidth}
+    \[ \mu x . un!bool . x \]
+    \end{minipage}
+    \begin{minipage}{0.45\textwidth}
+        \begin{lstlisting}{language=pilang}
+rec x . un ! bool . x
+        \end{lstlisting}
+    \end{minipage}
 \end{frame}
 
 \begin{frame}[fragile]{Recursive Types (3/4)}
@@ -80,8 +89,6 @@ instance Bisimulation SpiType where
     behave t@(Recursive x t') = behave (subsType x t t')
     behave t = (t, t)
     \end{minted}
-
-    Other types resort to syntactic equivalence
 \end{frame}
 
 \subsection{Tuple Syntax}
@@ -102,7 +109,7 @@ instance Bisimulation SpiType where
 
 \subsection{Replicated Behaviour}
 
-\begin{frame}{Replicated Behaviour (1)}
+\begin{frame}{Replicated Behaviour (1/3)}
     Section 5 modifies process syntax annotating receiving channels with \texttt{lin} and \texttt{un} modifiers:
     \begin{itemize}
         \item if a channel is annotated with \texttt{lin} then it is consumed;
@@ -119,7 +126,7 @@ instance Bisimulation SpiType where
 
 \end{frame}
 
-\begin{frame}{Replicated Behaviour (2)}
+\begin{frame}{Replicated Behaviour (2/3)}
     Types are updated following a third invariant:
     \begin{description}
         \item[inv. (iii)] Unrestricted input processes may not contain free linear variables.
@@ -132,14 +139,15 @@ instance Bisimulation SpiType where
     \end{itemize}
 \end{frame}
 
-\begin{frame}{Replicated Behaviour (3)}
+\begin{frame}{Replicated Behaviour (3/3)}
     Hence the new rules for receiving channels are:
     \begin{block}{Rule \textsc{T-In}}
         \begin{flalign*}
             \begin{prooftree}
+                \hypo{q(\Gamma_1 \circ \Gamma_2)}
                 \hypo{\Gamma_1 \vdash x : q?T.U}
                 \hypo{(\Gamma_2 + x : U), y : T \vdash P}
-                \infer2[[\textsc{T-In}]]{\Gamma_1 \circ \Gamma_2 \vdash x(y).P}
+                \infer3[[\textsc{T-In}]]{\Gamma_1 \circ \Gamma_2 \vdash q x(y).P}
             \end{prooftree}
         \end{flalign*}
     \end{block}
@@ -158,4 +166,15 @@ instance Bisimulation SpiType where
             \end{prooftree}
         \end{flalign*}
     \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Commands}
+
+    To run the program the command is:
+    \begin{minted}{sh}
+stack run -- [nd] path/to/file.spi
+    \end{minted}
+
+    Specify the \texttt{nd} flag to use the context split type checker.
+    
 \end{frame}

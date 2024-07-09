@@ -97,7 +97,7 @@ update :: String -> SpiType -> CT ()
 update k t = do
     may <- liftPure (M.lookup k)
     case may of
-        Just found -> unless (predicate Un t && found /$\approx$/ t) 
+        Just found -> unless (unrestricted t && found /$\approx$/ t) 
             (throwError "Error message..")
         Nothing    -> sideEffect (M.insert k t)
         \end{minted}
@@ -108,13 +108,13 @@ update k t = do
 
 \begin{frame}[fragile]{Basic Types - Mixing rules and operations}
 
-    \begin{exampleblock}{Context update}
+    \begin{exampleblock}{Variable extraction}
         Context transitions can even return useful values:
         \small\begin{minted}{hs}
 extract :: String -> CT SpiType
 extract k = do
     t <- get k
-    unless (predicate Un t) (delete k)
+    unless (unrestricted t) (delete k)
     return t
         \end{minted}
     \end{exampleblock}
@@ -207,7 +207,15 @@ x >< y: rec x. ?bool.x .
     \end{exampleblock}
 \end{frame}
 
-\begin{frame}{Basic Types - Context Split (4/7)}
+\begin{frame}[fragile]{Basic Types - Context Split (4/7)}
+    
+    \begin{block}{Commands to run}
+        \small\begin{minted}{sh}
+stack build
+stack exec lcd-assignment-exe -- +RTS -s -ls -N2 -RTS \
+    nd assets/well-formed-ill-typed/multiple.spi
+        \end{minted}
+    \end{block}
     Running this program with one CPU, it takes roughly 7 seconds to terminate.
     \vspace{0.5cm}
 
@@ -252,7 +260,7 @@ check (Rec x y p) = do
     xType <- extract x -- If not present, the monadic
         -- bind will make the whole rule fail.
         -- The function extract will preserve
-        -- 
+        -- any unbounded channel
     (t, u) = case xType of 
             Qualified _ (Receiving t u) -> 
                 return (t, u)

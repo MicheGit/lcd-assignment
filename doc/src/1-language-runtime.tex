@@ -75,18 +75,37 @@ v ::= x
     
 \end{frame}
 
-\begin{frame}{Runtime - Channels (1/2)}
+\begin{frame}{Runtime - Channels (1/3)}
     Plain \texttt{MVar}s can await for value insertion with the function \[ \texttt{takeMVar :: MVar a -> IO a} \] but the dual operation \[ \texttt{putMVar :: MVar a -> a -> IO ()} \] does not await the variable to be ready to accept a new value.
 \end{frame}
 
 
-\begin{frame}{Runtime - Channels (2/2)}
+\begin{frame}{Runtime - Channels (2/3)}
     Channels are represented as tuples of \texttt{MVar}, meaning \texttt{(value, idle)}:
     \begin{itemize}
         \item \texttt{value :: MVar }$v$, containing the passed value, which needs to be evaluated;
         \item \texttt{idle :: MVar ()}, which has a \texttt{()} value in it when the channel is ready to receive.
     \end{itemize}
     Then, the \texttt{Channel} datatype further distinguishes whether it is a read end or a write end. Read ends and write ends share the same \texttt{MVar}s.
+\end{frame}
+
+\begin{frame}[fragile]{Runtime - Channels (3/3)}
+    The implementation is as follows:
+    \begin{minted}{hs}
+receive :: ChannelEnd -> IO Val
+receive (ReadEnd var idle) = do
+    putMVar idle ()     -- signals the other end that it 
+                        -- is ready to receive
+    takeMVar var
+receive _ = throw $ userError "..."
+
+send :: ChannelEnd -> Val -> IO ()
+send (WriteEnd var idle) val = do
+    takeMVar idle       -- waits until the other end is 
+                        -- ready to receive
+    putMVar var val
+send _ _ = throw $ userError "..."
+    \end{minted}
 \end{frame}
 
 \begin{frame}{Runtime - Program Behaviour (1/3)}

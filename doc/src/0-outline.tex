@@ -12,7 +12,7 @@
 \begin{frame}{Session Types - The $\pi$-calculus}
     This $\pi$-calculus' features are incrementtally presented through five sections:
     \begin{itemize}
-        \item \textbf{basics and fundamentals} features, as scope restriction, in sections 2 and 3;
+        \item language \textbf{syntax and semantics}, and \textbf{basic types and rules}, in sections 2 and 3;
         \item \textbf{recursive types}, needed to write useful unrestricted types, in section 4;
         \item \textbf{unbounded computations}, in section 5, that enable infinite behaviours;
         \item \textbf{branching and selection}, in section 6 (not implemented).
@@ -24,14 +24,18 @@
 \subsection*{Software features}
 
 \begin{frame}{Software features}
-    The software is written in Haskell and it features:
+    The software is written in Haskell and features:
     \begin{itemize}
         \item a \textbf{code interpreter}, that executes the code in Concurrent Haskell;
-        \item a \textbf{type checker}, parallelized using the \texttt{Eval} monad;
+        \item two \textbf{type checkers}:
+        \begin{itemize}
+            \item one following the rules with context split;
+            \item one implementing the algorithmic rules presented in \textbf{section 8};
+        \end{itemize}
         \item a type inferrer.
     \end{itemize}
 
-    The paper has several examples of the expected behaviour of the type checker, that are implemented here as unit tests to avoid regressions.
+    The paper has several examples of the expected behaviour of the type checker, that are implemented as unit tests.
 \end{frame}
 
 
